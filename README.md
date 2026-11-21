@@ -19,9 +19,13 @@ Existing mobile screen readers (such as TalkBack or NVDA) focus on reading scree
 
 - **11 Indian Regional Languages:** Native voice support in Telugu, Hindi, English, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, and Urdu.
 - **Hands-Free Wake Word:** Listens for *"Hey Swaram"* in the background using Screen Wake Lock to stay active without turning off the microphone.
-- **Voice Phone Calling:** Say *"Call Mom"* or *"Call 9876543210"* in English, Telugu, or Hindi. Integrates with the modern Contact Picker API (`navigator.contacts`) and provides one-tap dialing fallback for mobile browsers.
+- **Voice Phone Calling:** Say *"Call Mom"* or *"Call 9876543210"* in English, Telugu, or Hindi. Integrates with the modern Contact Picker API (`navigator.contacts`), voice contact saving (*"Save Mom 9848012345"*), and provides tap-anywhere mobile dialing.
+- **Medicine & Expiry Date Scanner:** Say *"check medicine"* or *"expiry date"* to scan medicine strips, syrup bottles, or ointment labels. Identifies the medicine name, use, expiry date, and announces clear warnings if expired or unreadable.
+- **Indian Currency & Bill Reader:** Say *"which note"* or *"read bill"* to recognize Indian Rupee notes (₹10 to ₹500) and announce totals on shopping receipts.
+- **Color & Light Detector:** Say *"what color is this"* or *"is the light on"* to identify clothing/object colors and room illumination.
+- **Hands-Free Device Status:** Zero-latency spoken responses for battery percentage & charging state via `navigator.getBattery()`, current time, and day/date.
+- **Spoken Voice Reminders:** Natural voice scheduling (*"remind me to take medicine in 5 minutes"*), audio bell chime, haptic feedback, spoken alert, and persistent storage.
 - **Voice Maps & Compass Navigation:** Provides distance and 8-point compass directions (e.g. *"Charminar is 4.9 km away. Head South-West, about 7 minutes"*) using OpenStreetMap and OSRM routing.
-- **Camera-to-Voice Reader:** Describe what is in front of you, read printed book text, medicine labels, or recognize Indian currency notes via the camera.
 - **Audio Study Coach (PDF Notes):** Upload textbook chapters or study notes in PDF format and ask questions aloud.
 - **Voice Biometric Lock:** Client-side speaker verification using Web Audio API FFT frequency analysis to prevent background voices from triggering commands.
 - **Emergency SOS:** Announces the user's current GPS coordinates aloud and opens an immediate dialer link to call emergency services (112 / 100).
