@@ -1,10 +1,6 @@
 """
-==============================================================================
-SWARAM AUTOMATED TEST SUITE
-Author: Kayala Durga Pavan Teja & Engineering Team
-Project: Swaram Voice-First Accessibility Assistant
-Tests: Health, Gemini Chat, Multi-Language, Audio TTS, Quiz Engine, Auth
-==============================================================================
+Integration test suite for Swaram backend.
+Kayala Durga Pavan Teja & team.
 """
 
 import unittest
