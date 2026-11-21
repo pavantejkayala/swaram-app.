@@ -2449,7 +2449,7 @@ function listen(wakeWait = false) {
       textEl.textContent = '“' + current + '”';
     }
 
-    // Fast end-of-speech auto-commit (triggers after 800ms silence)
+    // Ultra-fast end-of-speech auto-commit (triggers after 480ms silence)
     if (silenceTimer) clearTimeout(silenceTimer);
     if (!isWakeWaiting && state === 'listening' && current.length >= 2) {
       silenceTimer = setTimeout(() => {
@@ -2463,7 +2463,7 @@ function listen(wakeWait = false) {
             handle(sentence, vec);
           }
         }
-      }, 800);
+      }, 480);
     }
 
     if (finalHeard.trim()) {
