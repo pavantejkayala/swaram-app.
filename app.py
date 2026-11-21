@@ -870,6 +870,7 @@ def vision_describe():
     data = request.get_json(force=True, silent=True) or {}
     image_b64 = (data.get("image") or "").strip()
     lang_code = data.get("lang", "en-IN")
+    mode = (data.get("mode") or "general").strip().lower()
     lang_name = LANG_NAMES.get(lang_code, "English")
 
     if not image_b64:
@@ -885,15 +886,42 @@ def vision_describe():
     else:
         b64_clean = image_b64
 
-    prompt = (
-        f"You are Swaram's assistive camera eye for a blind or visually impaired person. "
-        f"Analyze this image and describe it clearly in spoken {lang_name}. "
-        "Prioritize in this order: "
-        "1. If Indian currency notes or coins (rupees) are visible, identify the exact denomination clearly (e.g. 500 rupees note, 100 rupees note). "
-        "2. If a medicine bottle, food pack, or document with printed text is visible, read the prominent name, dosage, or title text aloud. "
-        "3. Otherwise, describe key objects, people, or obstacles directly in front. "
-        f"Strict rules: Reply in spoken {lang_name} under 45 words. Strictly plain speech: NO markdown, NO asterisks, NO bullets, NO emojis."
-    )
+    if mode == "medicine":
+        prompt = (
+            f"You are Swaram's assistive medical eye for a blind or visually impaired person. "
+            f"Analyze this medicine, tablet strip, syrup bottle, or ointment in the image. "
+            f"1. Identify the medicine name and its basic medical use (e.g. pain relief, fever, infection, blood pressure). "
+            f"2. Read the expiry date and manufacturing date if visible. "
+            f"If the medicine has expired, clearly issue an urgent spoken warning: 'Warning: This medicine is expired. Do not consume.' "
+            f"If the label or expiry text is blurry or unreadable, clearly state: 'The medicine name or expiry date is unreadable. Please ask someone nearby or hold it closer under good lighting.' "
+            f"Strict rules: Reply in spoken {lang_name} in 2 short plain-speech sentences under 45 words. NO markdown, NO asterisks, NO bullets, NO emojis."
+        )
+    elif mode == "currency":
+        prompt = (
+            f"You are Swaram's assistive currency and bill reader for a blind or visually impaired person. "
+            f"Analyze this Indian currency note, coin, or printed store receipt/bill. "
+            f"1. If it is an Indian Rupee note, state the denomination clearly (e.g. 500 rupees note, 200 rupees note, 100 rupees note, 50 rupees note, 20 rupees note, 10 rupees note). If multiple notes are visible, state the count and total value. "
+            f"2. If it is a printed store bill or receipt, clearly state the total final amount due or paid. "
+            f"If neither note nor bill is clearly recognized, state: 'No currency note or bill clearly recognized. Please hold it flat under good light.' "
+            f"Strict rules: Reply in spoken {lang_name} in 1 to 2 short plain-speech sentences under 35 words. NO markdown, NO asterisks, NO bullets, NO emojis."
+        )
+    elif mode == "color":
+        prompt = (
+            f"You are Swaram's assistive color and ambient lighting detector for a blind or visually impaired person. "
+            f"1. Identify the dominant color and pattern of the object, clothing, or surface directly in front of the camera. "
+            f"2. Detect whether room lights are on or if the surroundings are bright, dim, or dark. "
+            f"Strict rules: Reply in spoken {lang_name} in 1 short plain-speech sentence under 25 words. NO markdown, NO asterisks, NO bullets, NO emojis."
+        )
+    else:
+        prompt = (
+            f"You are Swaram's assistive camera eye for a blind or visually impaired person. "
+            f"Analyze this image and describe it clearly in spoken {lang_name}. "
+            "Prioritize in this order: "
+            "1. If Indian currency notes or coins (rupees) are visible, identify the exact denomination clearly (e.g. 500 rupees note, 100 rupees note). "
+            "2. If a medicine bottle, food pack, or document with printed text is visible, read the prominent name, dosage, or title text aloud. "
+            "3. Otherwise, describe key objects, people, or obstacles directly in front. "
+            f"Strict rules: Reply in spoken {lang_name} under 45 words. Strictly plain speech: NO markdown, NO asterisks, NO bullets, NO emojis."
+        )
 
     body = {
         "contents": [{
@@ -908,7 +936,7 @@ def vision_describe():
     try:
         raw_desc = call_gemini(body, timeout=15)
         clean_desc = clean_for_speech(raw_desc)
-        return jsonify(ok=True, description=clean_desc, lang=lang_code)
+        return jsonify(ok=True, description=clean_desc, lang=lang_code, mode=mode)
     except Exception as exc:
         app.logger.error("Vision API error: %s", exc)
         fallback = {
@@ -916,7 +944,7 @@ def vision_describe():
             "hi-IN": "तस्वीर समझ नहीं आई, कृपया दोबारा प्रयास करें।",
             "en-IN": "Could not describe the camera image. Please try again."
         }.get(lang_code, "Could not describe the camera image. Please try again.")
-        return jsonify(ok=False, error=str(exc), description=fallback), 502
+        return jsonify(ok=False, error=str(exc), description=fallback, mode=mode), 502
 
 
 @app.post("/api/ui-strings")
