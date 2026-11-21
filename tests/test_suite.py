@@ -86,6 +86,24 @@ class TestSwaramEndpoints(unittest.TestCase):
             self.assertGreaterEqual(data.get("total", 0), 1)
             print(f"  [PASS] Quiz engine verified: Question 1: '{data.get('question')[:50]}...'")
 
+    def test_06_vision_api(self):
+        """Verify camera-to-voice multimodal vision endpoint for visually impaired users."""
+        sample_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        payload = json.dumps({"image": sample_b64, "lang": "en-IN"}).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/api/vision",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode())
+            self.assertTrue(data.get("ok"))
+            desc = data.get("description", "")
+            self.assertTrue(len(desc) > 3)
+            self.assertNotIn("*", desc)
+            print(f"  [PASS] Vision API verified: '{desc[:50]}...'")
+
 
 if __name__ == "__main__":
     print("=" * 65)
