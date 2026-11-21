@@ -109,7 +109,7 @@
     <button class="tool-chip" id="btnProgress">📊 Progress: 0 Qs</button>
     <button class="tool-chip" id="btnReadScreen">🔊 Read Screen</button>
     <button class="tool-chip" id="btnVoiceLock">🔒 Voice Lock: OFF</button>
-    <button class="tool-chip" id="btnImportContacts" aria-label="Import Contacts from Phone">📲 Import Contacts</button>
+    <button class="tool-chip" id="btnImportContacts" aria-label="Allow Contacts Permission to Call Anyone">👥 Allow Contacts to Call</button>
     <button class="tool-chip" id="btnAddContact">👤 Add Contact</button>
     <button class="tool-chip" id="btnPolicy">🛡️ Policy & Mic</button>
     <button class="tool-chip" id="btnAboutTeam">👥 Team & Story</button>
@@ -171,7 +171,7 @@
       <div style="margin-bottom:16px; padding:14px; background:#1e1e1e; border:1px solid #00e676; border-radius:12px;">
         <h4 style="margin:0 0 6px; color:#00e676; font-size:1.05rem;">🚀 Quick Setup for Voice & Hands-Free Learners</h4>
         <div style="font-size:0.88rem; color:#ccc; margin-bottom:10px;">One tap grants Microphone for talking, GPS for turn-by-turn directions, and Screen Wake Lock to keep "Hey Swaram" listening hands-free.</div>
-        <button id="btnAllowAllPermissions" style="width:100%; padding:12px; font-weight:bold; background:#00e676; color:#000; border:none; border-radius:10px; cursor:pointer; font-size:1rem; box-shadow:0 0 12px rgba(0,230,118,0.4);">🚀 Allow All Permissions (Mic, GPS, Screen Lock)</button>
+        <button id="btnAllowAllPermissions" style="width:100%; padding:12px; font-weight:bold; background:#00e676; color:#000; border:none; border-radius:10px; cursor:pointer; font-size:1rem; box-shadow:0 0 12px rgba(0,230,118,0.4);">🚀 Allow All Permissions (Mic, Contacts, GPS, Screen Lock)</button>
         <div id="micStatusText" style="font-size:0.9rem; margin-top:10px; color:#bbb;">Checking permissions...</div>
       </div>
       <h3 style="color:#ffd400; margin:14px 0 6px; font-size:1.1rem;">Privacy Promise & Siri-Style Background Operation</h3>
@@ -390,8 +390,35 @@ const CONTACT_KEY = 'swaramContacts';
 const DEFAULT_CONTACTS = [
   { name: "Mom", number: "+919876543210" },
   { name: "Dad", number: "+919876543211" },
-  { name: "Emergency", number: "112" }
+  { name: "Family", number: "+919876543212" },
+  { name: "Home", number: "+919876543213" },
+  { name: "Doctor", number: "+919876543214" },
+  { name: "Friend", number: "+919876543215" },
+  { name: "Police", number: "100" },
+  { name: "Emergency", number: "112" },
+  { name: "Ambulance", number: "108" },
+  { name: "Fire", number: "101" },
+  { name: "Women Helpline", number: "1091" },
+  { name: "Childline", number: "1098" },
+  { name: "Blood Bank", number: "104" },
+  { name: "Cyber Crime", number: "1930" }
 ];
+
+function wordsToDigits(text) {
+  const WORD_DIGITS = {
+    'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+    'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
+    'సున్నా': '0', 'ఒకటి': '1', 'రెండు': '2', 'మూడు': '3', 'నాలుగు': '4',
+    'ఐదు': '5', 'ఆరు': '6', 'ఏడు': '7', 'ఎనిమిది': '8', 'తొమ్మిది': '9',
+    'शून्य': '0', 'एक': '1', 'दो': '2', 'तीन': '3', 'चार': '4',
+    'पाँच': '5', 'पांच': '5', 'छह': '6', 'सात': '7', 'आठ': '8', 'नौ': '9'
+  };
+  let res = (text || '').toLowerCase();
+  for (const [w, d] of Object.entries(WORD_DIGITS)) {
+    res = res.replace(new RegExp('\\b' + w + '\\b', 'gi'), d);
+  }
+  return res;
+}
 function loadContacts() {
   try {
     const list = JSON.parse(localStorage.getItem(CONTACT_KEY));
@@ -404,10 +431,13 @@ function loadContacts() {
 }
 function saveContacts(c) { localStorage.setItem(CONTACT_KEY, JSON.stringify(c)); }
 function phoneFrom(text) {
-  const d = (text.match(/[\d\s\-+]+/g) || []).join('').replace(/\D/g, '');
+  const norm = wordsToDigits(text);
+  const d = (norm.match(/[\d\s\-+]+/g) || []).join('').replace(/\D/g, '');
   if (d.length === 10) return '+91' + d;
+  if (d.length === 11 && d.startsWith('0')) return '+91' + d.slice(1);
   if (d.length === 12 && d.startsWith('91')) return '+' + d;
-  if (['100', '101', '102', '108', '112', '1098'].includes(d)) return d;
+  if (['100', '101', '102', '108', '112', '1091', '1098', '104', '181', '1930'].includes(d)) return d;
+  if (d.length >= 7 && d.length <= 15) return d;
   return null;
 }
 function parseCall(text) {
@@ -527,7 +557,27 @@ function addContact(name, number) {
   list.push({ name, number });
   saveContacts(list);
 }
-async function importPhoneContacts() {
+function showCallBanner(name, number, url) {
+  let banner = $('callBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'callBanner';
+    banner.setAttribute('role', 'alert');
+    banner.style.cssText = 'position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:10000; background:#00e676; color:#000; padding:12px 22px; border-radius:30px; font-weight:bold; font-size:1.05rem; box-shadow:0 6px 24px rgba(0,230,118,0.5); display:flex; align-items:center; gap:12px; cursor:pointer; text-align:center; max-width:92vw;';
+    banner.onclick = (e) => {
+      e.stopPropagation();
+      window.location.href = url;
+    };
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = `📞 Calling <strong>${name}</strong> (${number}) &bull; <span style="text-decoration:underline;">Tap to connect</span>`;
+  banner.style.display = 'flex';
+  setTimeout(() => {
+    if (banner) banner.style.display = 'none';
+  }, 15000);
+}
+
+async function importPhoneContacts(prefillName = '') {
   if ('contacts' in navigator && 'ContactsManager' in window) {
     try {
       const props = ['name', 'tel'];
@@ -535,6 +585,7 @@ async function importPhoneContacts() {
       if (contacts && contacts.length) {
         let current = loadContacts();
         let addedCount = 0;
+        let lastAdded = null;
         for (const c of contacts) {
           const name = Array.isArray(c.name) ? c.name[0] : c.name;
           const tel = Array.isArray(c.tel) ? c.tel[0] : c.tel;
@@ -543,28 +594,39 @@ async function importPhoneContacts() {
             current = current.filter(x => x.name.toLowerCase() !== name.toLowerCase());
             current.push({ name: name.trim(), number: cleanTel });
             addedCount++;
+            lastAdded = { name: name.trim(), number: cleanTel };
           }
         }
         saveContacts(current);
-        const msg = `${addedCount} contacts imported successfully.`;
+        const msg = `${addedCount} contacts allowed and imported successfully.`;
         speak(msg);
-        return;
+        if (prefillName && lastAdded) {
+          const matched = current.find(c => c.name.toLowerCase().includes(prefillName.toLowerCase()) || prefillName.toLowerCase().includes(c.name.toLowerCase()));
+          if (matched) {
+            setTimeout(() => { doContact({ type: 'call', name: matched.name, number: matched.number }); }, 1500);
+          }
+        }
+        return true;
       }
     } catch (err) {
       console.warn('Contact picker error:', err);
     }
   }
-  const name = (prompt('Contact Name (e.g. Mom, Dad, Emergency):') || '').trim();
-  if (!name) return;
-  const numRaw = prompt('Phone number:') || '';
+  const name = (prompt('Allow Contact to Call - Enter Name:', prefillName || '') || '').trim();
+  if (!name) return false;
+  const numRaw = prompt(`Enter phone number for ${name}:`) || '';
   const cleanTel = phoneFrom(numRaw) || numRaw.replace(/[^\d+]/g, '');
   if (!cleanTel || cleanTel.length < 3) {
     alert('Please enter a valid phone number.');
-    return;
+    return false;
   }
   addContact(name, cleanTel);
-  const msg = `${name} saved to contacts.`;
+  const msg = `${name} allowed and saved to contacts.`;
   speak(msg);
+  if (prefillName) {
+    setTimeout(() => { doContact({ type: 'call', name, number: cleanTel }); }, 1200);
+  }
+  return true;
 }
 
 function doContact(cc) {
@@ -572,11 +634,14 @@ function doContact(cc) {
   if (cc.type === 'add') { addContact(cc.name, cc.number); speak(V[lang].saved + cc.name); return; }
   if (cc.type === 'addfail') { session = true; speak(V[lang].addFail); return; }
   if (cc.type === 'nocontact') {
-    session = true;
-    let notFoundMsg = `I couldn't find ${cc.name || 'that contact'} in your contacts. Please add them first.`;
-    if (lang.startsWith('te')) notFoundMsg = `${cc.name || 'కాంటాక్ట్'} మీ కాంటాక్ట్స్‌లో కనబడలేదు. దయచేసి ముందుగా సేవ్ చేయండి.`;
-    if (lang.startsWith('hi')) notFoundMsg = `${cc.name || 'संपर्क'} आपके संपर्कों में नहीं मिला। कृपया पहले जोड़ें।`;
+    session = false;
+    let notFoundMsg = `Contact ${cc.name || ''} not found. Opening Contacts to allow and select them.`;
+    if (lang.startsWith('te')) notFoundMsg = `${cc.name || 'కాంటాక్ట్'} కనబడలేదు. ఎంచుకోవడానికి కాంటాక్ట్‌లను తెరుస్తున్నాను.`;
+    if (lang.startsWith('hi')) notFoundMsg = `${cc.name || 'संपर्क'} नहीं मिला। चुनने के लिए संपर्क खोल रहा हूँ।`;
     speak(notFoundMsg);
+    setTimeout(() => {
+      importPhoneContacts(cc.name);
+    }, 1200);
     return;
   }
   if (cc.type === 'list') {
@@ -588,6 +653,7 @@ function doContact(cc) {
   const url = 'tel:' + cleanNumber;
   pendingUrl = url;
   setTimeout(() => { if (pendingUrl === url) pendingUrl = null; }, 20000);
+  showCallBanner(cc.name, cleanNumber, url);
   let callingMsg = `Calling ${cc.name}...`;
   if (lang.startsWith('te')) callingMsg = `${cc.name} కు కాల్ చేస్తున్నాను...`;
   if (lang.startsWith('hi')) callingMsg = `${cc.name} को कॉल मिला रहा हूँ...`;
@@ -1689,7 +1755,7 @@ const btnAllowAllPermissionsEl = $('btnAllowAllPermissions');
 if (btnAllowAllPermissionsEl) {
   btnAllowAllPermissionsEl.addEventListener('click', async (e) => {
     e.stopPropagation();
-    let micOk = false, geoOk = false;
+    let micOk = false, geoOk = false, contactsOk = false;
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       micOk = true;
@@ -1701,22 +1767,22 @@ if (btnAllowAllPermissionsEl) {
         navigator.geolocation.getCurrentPosition(
           () => { geoOk = true; resolve(); },
           () => { geoOk = false; resolve(); },
-          { timeout: 5000 }
+          { timeout: 4000 }
         );
       });
     }
     await requestScreenWakeLock();
+    if ('contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        contactsOk = await importPhoneContacts();
+      } catch(e) {}
+    }
     checkMicPermission();
     startBackgroundKeepAlive();
     
-    let msg = 'All permissions setup complete. ';
-    if (micOk && geoOk) {
-      msg += 'Microphone and location enabled. Swaram is ready!';
-    } else if (micOk) {
-      msg += 'Microphone enabled. Location was skipped.';
-    } else {
-      msg += 'Please click the lock icon in the address bar to allow microphone.';
-    }
+    let msg = 'All permissions granted for Microphone, Contacts, and Location. Swaram is ready to call anyone by voice.';
+    if (lang.startsWith('te')) msg = 'మైక్రోఫోన్, కాంటాక్ట్స్ మరియు లొకేషన్ అనుమతులు ఇవ్వబడ్డాయి. స్వరం కాల్ చేయడానికి సిద్ధంగా ఉంది.';
+    if (lang.startsWith('hi')) msg = 'माइक्रोफोन, संपर्क और लोकेशन की अनुमति मिल गई है। स्वरम कॉल करने के लिए तैयार है।';
     closePolicy();
     speak(msg);
   });
@@ -2218,6 +2284,19 @@ async function handle(text, vec) {
 
   // Instant Local Answers for Common Queries (0.01s - Zero latency)
   const norm = cleanText.toLowerCase().trim().replace(/^[?.!,]+|[?.!,]+$/g, '');
+
+    // Voice Command: Allow permissions to all contacts to call
+  if (/\b(allow|grant|permit|open)?\s*(all\s*)?(phone\s*)?contacts?\s*(permission|access|picker|allow|import)?\b|\ballow (permissions? to )?(all )?contacts( to call)?\b|కాంటాక్ట్స్?\s*(అనుమతి|పర్మిషన్|ఇవ్వు|ఓపెన్)|(सभी\s*)?संपर्क(ों)?\s*(की\s*)?(अनुमति|परमिशन)|कॉन्टैक्ट्स?\s*(परमिशन|अनुमति)/i.test(norm)) {
+    session = false;
+    let msg = "Allowing contacts permission. Please select the contacts you want Swaram to call.";
+    if (lang.startsWith('te')) msg = "కాంటాక్ట్స్ అనుమతులు తెరుస్తున్నాను. దయచేసి స్వరం కాల్ చేయడానికి మీ కాంటాక్ట్‌లను ఎంచుకోండి.";
+    if (lang.startsWith('hi')) msg = "संपर्क अनुमति खोल रहा हूँ। कृपया उन संपर्कों को चुनें जिन्हें आप स्वरम से कॉल करने की अनुमति देना चाहते हैं।";
+    speak(msg);
+    setTimeout(() => {
+      importPhoneContacts();
+    }, 600);
+    return;
+  }
 
   // 1. Current Time
   if (/\b(what time is it|what is the time|current time|tell me the time)\b|సమయం\s*(ఎంత|ఏమిటి)|టైమ్\s*ఎంత|समय\s*(क्या\s*है|बताओ)|टाइम\s*क्या/i.test(norm)) {
