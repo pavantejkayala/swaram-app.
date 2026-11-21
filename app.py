@@ -16,6 +16,7 @@ ARCHITECTURAL PRINCIPLES:
 import asyncio
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -26,7 +27,7 @@ import urllib.parse
 import edge_tts
 import pypdf
 import requests
-from flask import Flask, jsonify, request, send_from_directory, Response
+from flask import Flask, jsonify, request, send_from_directory, Response, stream_with_context
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -257,8 +258,8 @@ def build_system_prompt(lang_code: str) -> str:
     return (
         f"You are Swaram, a lightning-fast voice AI assistant like Siri. "
         f"Reply in {lang}. Spoken text only: strictly no markdown, no asterisks, no bullets, no emojis. "
-        "Be direct, warm, and concise: answer immediately in 1 short spoken sentence (under 20 words). "
-        "Never use lists, preambles, or filler. Give the direct answer immediately. "
+        "Be direct, warm, and concise: answer immediately in 1 to 2 short, natural spoken sentences. "
+        "No markdown, no bullet points, no filler. "
         "Native script: Telugu script for Telugu, Devanagari for Hindi/Marathi, Tamil script for Tamil, English for English."
     )
 
@@ -271,10 +272,38 @@ def clean_for_speech(text: str) -> str:
     return text.strip()
 
 
+def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_lambda = math.radians(lon2 - lon1)
+    y = math.sin(delta_lambda) * math.cos(phi2)
+    x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(delta_lambda)
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+
+def bearing_to_compass(bearing: float, lang: str = "en-IN") -> str:
+    directions = [
+        ("North", "ఉత్తరం", "उत्तर"),
+        ("North-East", "ఉత్తర-తూర్పు", "उत्तर-पूर्व"),
+        ("East", "తూర్పు", "पूर्व"),
+        ("South-East", "దక్షిణ-తూర్పు", "दक्षिण-पूर्व"),
+        ("South", "దక్షిణం", "दक्षिण"),
+        ("South-West", "దక్షిణ-పశ్చిమం", "दक्षिण-पश्चिम"),
+        ("West", "పశ్చిమం", "पश्चिम"),
+        ("North-West", "ఉత్తర-పశ్చిమం", "उत्तर-पश्चिम"),
+    ]
+    idx = round(bearing / 45) % 8
+    en, te, hi = directions[idx]
+    if lang.startswith("te"):
+        return te
+    elif lang.startswith("hi"):
+        return hi
+    return en
+
+
 def gen_config(**extra):
     cfg = {
         "temperature": 0.3,
-        "maxOutputTokens": 60,
+        "maxOutputTokens": 150,
     }
     cfg.update(extra)
     return cfg
@@ -630,6 +659,217 @@ def chat():
     except Exception as exc:
         app.logger.error("Gemini error: %s", exc)
         return jsonify(error=str(exc)), 502
+
+
+@app.post("/api/chat-stream")
+def chat_stream():
+    if not GEMINI_API_KEY:
+        return jsonify(error="GEMINI_API_KEY is not set on the server"), 500
+
+    data = request.get_json(force=True, silent=True) or {}
+    message = (data.get("message") or "").strip()
+    lang = data.get("lang", "en-IN")
+    history = data.get("history", [])[-12:]
+
+    if not message:
+        return jsonify(error="empty message"), 400
+
+    session_id = request.headers.get("X-Session-ID", "default")
+    doc = db_get_doc(session_id)
+
+    doc_prompt = ""
+    if doc:
+        doc_prompt = (
+            f"\n\n[STUDY NOTES / UPLOADED PDF CONTEXT]\n"
+            f"File: {doc['filename']} ({doc['pages']} pages)\n"
+            f"Notes content:\n'''{doc['text'][:8000]}'''\n"
+            "If the learner asks about their notes, questions from the PDF, or asks for a summary or quiz on their notes, "
+            "teach and explain accurately based on these notes in simple spoken sentences."
+        )
+
+    prog = db_get_progress(session_id)
+    prog["questionsAnswered"] = prog.get("questionsAnswered", 0) + 1
+    db_save_progress(session_id, prog)
+
+    contents = []
+    for turn in history:
+        role = "user" if turn.get("role") == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": str(turn.get("text", ""))}]})
+    contents.append({"role": "user", "parts": [{"text": message}]})
+
+    body = {
+        "system_instruction": {"parts": [{"text": build_system_prompt(lang) + doc_prompt}]},
+        "contents": contents,
+        "generationConfig": gen_config(maxOutputTokens=150),
+    }
+
+    def generate():
+        models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+        models_to_try = list(dict.fromkeys(models_to_try))
+
+        stream_resp = None
+        for model in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
+            try:
+                r = HTTP_SESSION.post(
+                    url,
+                    headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
+                    json=body,
+                    stream=True,
+                    timeout=(6, 15)
+                )
+                if r.status_code == 200:
+                    stream_resp = r
+                    break
+            except Exception as e:
+                app.logger.warning(f"Model {model} stream failed: {e}")
+                continue
+
+        if not stream_resp:
+            err_msg = {
+                "te-IN": "క్షమించండి, సర్వర్ కనెక్ట్ కాలేదు. దయచేసి మళ్ళీ చెప్పండి.",
+                "hi-IN": "माफ़ कीजिए, सर्वर से संपर्क नहीं हो पाया। कृपया दोबारा बोलिए।",
+                "en-IN": "Sorry, could not connect to server. Please say that again."
+            }.get(lang, "Sorry, please say that again.")
+            yield f"data: {json.dumps({'sentence': err_msg, 'done': False}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'done': True, 'full_text': err_msg}, ensure_ascii=False)}\n\n"
+            return
+
+        buffer = ""
+        full_text_accum = []
+        for line in stream_resp.iter_lines():
+            if not line:
+                continue
+            line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+            if line_str.startswith("data: "):
+                raw_json = line_str[6:].strip()
+                if not raw_json:
+                    continue
+                try:
+                    payload = json.loads(raw_json)
+                    cands = payload.get("candidates", [])
+                    if cands:
+                        parts = cands[0].get("content", {}).get("parts", [])
+                        chunk_text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text"))
+                        if chunk_text:
+                            buffer += chunk_text
+                            while True:
+                                m = re.search(r'([.?!।\n]+)(?:\s+|$)', buffer)
+                                if not m:
+                                    break
+                                end_pos = m.end()
+                                raw_sent = buffer[:end_pos]
+                                buffer = buffer[end_pos:]
+                                clean_sent = clean_for_speech(raw_sent)
+                                if len(clean_sent) >= 2:
+                                    full_text_accum.append(clean_sent)
+                                    yield f"data: {json.dumps({'sentence': clean_sent, 'done': False}, ensure_ascii=False)}\n\n"
+                except Exception:
+                    continue
+
+        if buffer.strip():
+            clean_last = clean_for_speech(buffer)
+            if len(clean_last) >= 2:
+                full_text_accum.append(clean_last)
+                yield f"data: {json.dumps({'sentence': clean_last, 'done': False}, ensure_ascii=False)}\n\n"
+
+        full_reply = " ".join(full_text_accum).strip()
+        yield f"data: {json.dumps({'done': True, 'full_text': full_reply}, ensure_ascii=False)}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@app.post("/api/directions")
+def get_directions():
+    data = request.get_json(force=True, silent=True) or {}
+    dest_name = (data.get("destination_name") or data.get("destination") or "").strip()
+    origin_lat = data.get("origin_lat")
+    origin_lng = data.get("origin_lng")
+    lang = data.get("lang", "en-IN")
+
+    if not dest_name:
+        return jsonify(ok=False, error="No destination provided"), 400
+
+    maps_url = f"https://www.google.com/maps/dir/?api=1&destination={urllib.parse.quote(dest_name)}"
+
+    if origin_lat is None or origin_lng is None:
+        summary = {
+            "te-IN": f"గూగుల్ మ్యాప్స్‌లో {dest_name} నావిగేషన్ తెరుస్తున్నాను.",
+            "hi-IN": f"गूगल मैप्स पर {dest_name} का नेविगेशन खोल रहा हूँ।",
+            "en-IN": f"Opening navigation to {dest_name} on Google Maps."
+        }.get(lang, f"Opening navigation to {dest_name} on Google Maps.")
+        return jsonify(ok=True, destination=dest_name, summary=summary, maps_url=maps_url)
+
+    try:
+        origin_lat = float(origin_lat)
+        origin_lng = float(origin_lng)
+    except (ValueError, TypeError):
+        origin_lat, origin_lng = None, None
+
+    dest_lat, dest_lng = None, None
+    try:
+        headers = {"User-Agent": "SwaramVoiceAssistant/1.0 (accessibility-app)"}
+        nom_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(dest_name)}&format=json&limit=1"
+        resp = requests.get(nom_url, headers=headers, timeout=6)
+        if resp.status_code == 200 and resp.json():
+            item = resp.json()[0]
+            dest_lat = float(item["lat"])
+            dest_lng = float(item["lon"])
+    except Exception as e:
+        app.logger.warning(f"Nominatim geocode error: {e}")
+
+    distance_km = None
+    duration_min = None
+    compass_dir = None
+
+    if dest_lat is not None and dest_lng is not None and origin_lat is not None:
+        bearing = calculate_bearing(origin_lat, origin_lng, dest_lat, dest_lng)
+        compass_dir = bearing_to_compass(bearing, lang)
+
+        try:
+            osrm_url = f"http://router.project-osrm.org/route/v1/driving/{origin_lng},{origin_lat};{dest_lng},{dest_lat}?overview=false"
+            osrm_resp = requests.get(osrm_url, timeout=6)
+            if osrm_resp.status_code == 200:
+                routes = osrm_resp.json().get("routes", [])
+                if routes:
+                    dist_meters = routes[0].get("distance", 0)
+                    dur_seconds = routes[0].get("duration", 0)
+                    distance_km = round(dist_meters / 1000.0, 1)
+                    duration_min = max(1, round(dur_seconds / 60.0))
+        except Exception as e:
+            app.logger.warning(f"OSRM routing error: {e}")
+
+        if distance_km is None:
+            dlat = math.radians(dest_lat - origin_lat)
+            dlon = math.radians(dest_lng - origin_lng)
+            a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(origin_lat)) * math.cos(math.radians(dest_lat)) * math.sin(dlon / 2) ** 2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            distance_km = round(6371 * c * 1.3, 1)
+            duration_min = max(1, round((distance_km / 30.0) * 60))
+
+    if distance_km is not None and compass_dir:
+        if lang.startswith("te"):
+            summary = f"{dest_name} సుమారు {distance_km} కిలోమీటర్ల దూరంలో ఉంది. {compass_dir} వైపు వెళ్ళండి, ప్రయాణ సమయం దాదాపు {duration_min} నిమిషాలు."
+        elif lang.startswith("hi"):
+            summary = f"{dest_name} लगभग {distance_km} किलोमीटर दूर है। {compass_dir} की ओर बढ़ें, लगभग {duration_min} मिनट लगेंगे।"
+        else:
+            summary = f"{dest_name} is about {distance_km} kilometers away. Head {compass_dir}, about {duration_min} minutes."
+    else:
+        summary = {
+            "te-IN": f"{dest_name} నావిగేషన్ సిద్ధంగా ఉంది. గూగుల్ మ్యాప్స్ తెరుస్తున్నాను.",
+            "hi-IN": f"{dest_name} का नेविगेशन तैयार है। गूगल मैप्स खोल रहा हूँ।",
+            "en-IN": f"Navigation to {dest_name} is ready. Opening Google Maps."
+        }.get(lang, f"Opening navigation to {dest_name} on Google Maps.")
+
+    return jsonify(
+        ok=True,
+        destination=dest_name,
+        distance_km=distance_km,
+        duration_min=duration_min,
+        direction=compass_dir,
+        summary=summary,
+        maps_url=maps_url
+    )
 
 
 @app.post("/api/vision")
