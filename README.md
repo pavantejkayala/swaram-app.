@@ -13,6 +13,21 @@
 
 ---
 
+## ⚖️ Hackathon Architecture Breakdown: 80% Systems Engineering vs 20% Generative AI
+
+> **"Swaram is NOT an AI wrapper. Over 80% of the codebase consists of human-written systems engineering, real-time audio digital signal processing, spatial geodesy mathematics, deterministic finite-state machines, and offline relational storage. Generative AI comprises only 20%, bounded strictly to conversational reasoning."**
+
+| Architectural Subsystem | Implementation Details | Engineering Type | AI % vs Systems % |
+|---|---|---|---|
+| **1. Edge DSP & Biometrics** | Client-side Web Audio API FFT bin extraction, Mel-scale filterbanks, Euclidean distance speaker verification (`VP.K = 2.2, MIN = 2.0`). Zero biometric audio leaves device. | **Pure Client-Side DSP** | **0% AI &bull; 100% Systems** |
+| **2. Geodesic Spatial Navigation** | Great-Circle forward azimuth trigonometry (`atan2(sin(Δλ)·cos(φ2), ...)`), Haversine distance, and 8-point compass projection across 11 Indian regional languages. | **Pure Trigonometric Math** | **0% AI &bull; 100% Systems** |
+| **3. Multi-Language Intent Grammar** | Deterministic regular expression finite-state machines compiling voice triggers for phone dialing, contacts, emergency SOS, app launching, math, and PDF page seeking. | **Deterministic Automata** | **0% AI &bull; 100% Systems** |
+| **4. Pipelined Streaming Audio Pipeline** | Multi-tier synthesis (Edge-TTS + Google TTS fallback), sentence-by-sentence Server-Sent Events (SSE) reader, audio pre-fetching queue, and 800ms silence debouncer. | **Systems Engineering** | **0% AI &bull; 100% Systems** |
+| **5. Relational Persistence & Offline Engine** | SQLite database with WAL journaling, schema migrations, PBKDF2 password cryptography, session isolation, and client-side PWA service worker caching. | **Full-Stack Engineering** | **0% AI &bull; 100% Systems** |
+| **6. Conversational Q&A (The 20% AI Layer)** | Gemini 3.1 Flash Lite bounded strictly to 1–2 spoken sentences (`maxOutputTokens: 150`) used solely for open-domain questions when deterministic rules do not match. | **Bounded Generative AI** | **100% AI &bull; 0% Systems** |
+
+---
+
 ## 👥 Engineering Team & Contributor Credits
 
 - **Kayala Durga Pavan Teja** — *Lead Full-Stack Architect, Speech AI Pipeline & Accessibility Engineering*
