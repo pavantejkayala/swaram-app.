@@ -98,6 +98,7 @@
 
   <!-- 2. Hidden-by-Default Tools Drawer -->
   <div id="toolsDrawer" class="tools-drawer">
+    <button class="tool-chip" id="btnTtsEngine">⚡ Voice: Fast (1s)</button>
     <button class="tool-chip" id="btnWakeWord">🎙️ "Hey Swaram": ON</button>
     <button class="tool-chip" id="btnUploadNotes">📄 Upload Notes</button>
     <button class="tool-chip" id="btnProgress">📊 Progress: 0 Qs</button>
@@ -312,8 +313,16 @@ function parseOpen(text) {
     if (q) return { name: 'Google: ' + q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
   }
   if (!OPENV.test(t)) return null;
-  if (site) return { name: site[1], url: site[2] };
   const q = t.replace(new RegExp(OPENV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Check if it's an app name (calculator, notepad, camera, whatsapp, spotify, settings, paint, etc.)
+  const APP_NAMES = /\b(calculator|calc|notepad|notes|camera|settings|paint|explorer|files|spotify|whatsapp|clock|timer|alarm|calendar|chrome|browser|terminal|cmd|store|weather|photos)\b|క్యాలిక్యులేటర్|నోట్‌ప్యాడ్|క్యామెరా|సెట్టింగ్స్|పెయింట్|ఫైల్స్|స్పాటిఫై|వాట్సాప్|గడియారం|క్యాలెండర్|కాల్కులేటర్|नोटपैड|कैमरा|सेटिंग्स|पेंट|फ़ाइलें|स्पॉटिफाई|व्हाट्सएप|घड़ी|कैलेंडर/i;
+  if (APP_NAMES.test(q) || APP_NAMES.test(t)) {
+    const m = (q.match(APP_NAMES) || t.match(APP_NAMES))[0];
+    return { name: m, app: m };
+  }
+  
+  if (site) return { name: site[1], url: site[2] };
   if (!q || q.split(' ').length > 4) return null;      // long sentence = a lesson request, not a command
   return { name: q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
 }
@@ -668,6 +677,7 @@ let session = false;      // true = auto-listen again after each spoken reply
 let rec = null;
 let speakId = 0;          // guards against stale onend events after cancel()
 let voices = [];
+let ttsEngine = localStorage.getItem('swaramTtsEngine') || 'fast'; // 'fast' (~0.3s) or 'neural' (~1.2s)
 
 // ---------- helpers ----------
 function loadVoices() { voices = speechSynthesis.getVoices(); }
@@ -1398,7 +1408,8 @@ function speak(text) {
 
   // Primary: Ultra-realistic Neural Human Voice
   try {
-    const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}`;
+    const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'fast');
+    const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&engine=${encodeURIComponent(engine)}&text=${encodeURIComponent(text)}`;
     const audio = new Audio(audioUrl);
     audio.playbackRate = speechRate;
     currentAudio = audio;
@@ -1414,6 +1425,12 @@ function speak(text) {
       fallbackBrowserSpeak(text, myId, done);
     };
 
+    try {
+      if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    } catch(e) {}
+
     const p = audio.play();
     if (p !== undefined) {
       p.catch((err) => {
@@ -1422,12 +1439,14 @@ function speak(text) {
       });
     }
   } catch (e) {
+    console.warn('speak() exception, falling back:', e);
     fallbackBrowserSpeak(text, myId, done);
   }
 }
 
 function fallbackBrowserSpeak(text, myId, done) {
-  speechSynthesis.cancel();
+  try { window.speechSynthesis.cancel(); } catch(e) {}
+  try { window.speechSynthesis.resume(); } catch(e) {}
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang;
   const v = pickVoice(lang);
@@ -1845,6 +1864,24 @@ document.addEventListener('keydown', (e) => {
 
 
 // ================= TOP BAR & DRAWER WIRING =================
+
+const btnTtsEngine = $('btnTtsEngine');
+
+function updateTtsEngineUI() {
+  if (!btnTtsEngine) return;
+  btnTtsEngine.textContent = ttsEngine === 'fast' ? '⚡ Voice: Fast (1s)' : '🎙️ Voice: Neural (2s)';
+}
+if (btnTtsEngine) {
+  updateTtsEngineUI();
+  btnTtsEngine.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ttsEngine = ttsEngine === 'fast' ? 'neural' : 'fast';
+    localStorage.setItem('swaramTtsEngine', ttsEngine);
+    updateTtsEngineUI();
+    speak(ttsEngine === 'fast' ? 'Fast voice active.' : 'Neural voice active.');
+  });
+}
+
 const toolsToggle = $('toolsToggle');
 const toolsDrawer = $('toolsDrawer');
 const langSelect = $('langSelect');
