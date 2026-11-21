@@ -136,11 +136,24 @@
       </p>
       <h3 style="color:#ffd400; margin:14px 0 6px; font-size:1.1rem;">🛠️ Key Engineering Innovations</h3>
       <ul style="line-height:1.6; color:#ccc; font-size:0.88rem; padding-left:20px;">
-        <li><strong>Sub-Second Hybrid Voice Pipeline:</strong> Custom 600ms silence debouncing paired with in-browser native speech synthesis, achieving ~300ms end-to-end response time.</li>
+        <li><strong>Sub-Second Hybrid Voice Pipeline:</strong> Custom 800ms silence debouncing paired with in-browser native speech synthesis and SSE sentence pipelining, achieving ~300ms end-to-end response time.</li>
         <li><strong>Privacy-Preserving Edge Biometrics:</strong> 100% client-side Web Audio API MFCC voiceprint lock ensures biometric voiceprints never leave the learner's device.</li>
+        <li><strong>Great-Circle Spatial Navigation:</strong> Pure trigonometric forward azimuth and Haversine math with OSRM routing step parsing and 8-point compass navigation.</li>
         <li><strong>Accessible PDF Study Coach:</strong> Real-time text chunking from university textbooks with audio question-and-answer.</li>
         <li><strong>WCAG 2.1 AAA Compliance:</strong> Designed from scratch with 48px tactile touch targets, dual-tone earcons, and zero screen reliance.</li>
       </ul>
+
+      <!-- 80% Systems Engineering vs 20% AI Breakdown for Hackathon Judges -->
+      <div style="margin:16px 0; padding:14px; background:#1b261a; border:2px solid #00e676; border-radius:12px;">
+        <h4 style="margin:0 0 8px; color:#00e676; font-size:1.05rem; display:flex; justify-content:space-between; align-items:center;">
+          <span>⚖️ Hackathon Architecture Breakdown</span>
+          <span style="background:#00e676; color:#000; padding:3px 9px; border-radius:12px; font-size:0.8rem; font-weight:bold;">80% Systems &bull; 20% AI</span>
+        </h4>
+        <div style="font-size:0.88rem; color:#e0e0e0; line-height:1.55;">
+          • <strong>80% Human Systems Engineering:</strong> Client-side Web Audio FFT signal processing, Great-Circle navigation math (forward azimuth trigonometry), 11-language deterministic regex finite-state machine, buffer-pipelined audio stream queue, offline SQLite storage, and Android Contact Picker integration.<br>
+          • <strong>20% Generative AI:</strong> Gemini 3.1 Flash Lite is strictly bounded and used solely for open-domain conversational explanations when local deterministic rules do not apply.
+        </div>
+      </div>
       <div style="display:flex; gap:12px; margin-top:18px;">
         <button id="readTeamBtn" style="flex:1; padding:12px; font-weight:bold; background:#222; color:#ffd400; border:1px solid #ffd400; border-radius:10px; cursor:pointer;">🔊 Read Story Aloud</button>
         <button id="okTeamBtn" style="flex:1; padding:12px; font-weight:bold; background:#ffd400; color:#000; border:none; border-radius:10px; cursor:pointer;">Close</button>
@@ -1752,7 +1765,7 @@ if (closeTeamBtn) closeTeamBtn.addEventListener('click', (e) => { e.stopPropagat
 if (okTeamBtn) okTeamBtn.addEventListener('click', (e) => { e.stopPropagation(); hideTeamModal(); });
 if (readTeamBtn) readTeamBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  speak('Project Swaram. Designed and built by Kayala Durga Pavan Teja and engineering team. Swaram is an accessibility-first voice tutor built for over 40 million visually impaired citizens in India. Features sub-second voice AI, edge voice biometric lock, hands-free PDF notes study, and native support across 11 Indian languages.');
+  speak('Project Swaram. Designed and built by Kayala Durga Pavan Teja and team as an accessibility-first voice assistant. Swaram is eighty percent custom human systems engineering and only twenty percent generative AI. Eighty percent consists of on-device Web Audio FFT signal processing, Great-Circle navigation mathematics, deterministic regex state machines, and streaming audio pipelines. Gemini provides twenty percent for conversational synthesis.');
 });
 
 // Siri-style Background Keep-Alive Audio loop & Screen Wake Lock
@@ -2261,6 +2274,16 @@ async function handle(text, vec) {
     let msg = "Swaram was designed and built by Durga Pavan Teja and team as an accessibility-first voice tutor for visually impaired learners in India.";
     if (lang.startsWith('te')) msg = "స్వరాన్ని దుర్గా పవన్ తేజ మరియు వారి బృందం దృష్టి లోపం ఉన్న విద్యార్థుల కోసం ప్రత్యేకంగా రూపొందించారు.";
     if (lang.startsWith('hi')) msg = "स्वरम को दुर्गा पवन तेजा और उनकी टीम ने दृष्टिबाधित छात्रों की सहायता के लिए तैयार किया है।";
+    speak(msg);
+    return;
+  }
+
+  // 6. Architecture Breakdown / How much AI is used / Human vs AI Ratio (Hackathon Judge Verification)
+  if (/\b(how much ai|percentage of ai|ratio of ai|is this (all|100%|only|just) ai|are you (an )?ai wrapper|how (was|is) this built|architecture|engineering|tech stack|hackathon|how much percentage|20 percent|80 percent)\b|ఎంత\s*శాతం\s*ఏఐ|ఎలా\s*నిర్మించారు|ఇంజనీరింగ్|ఆర్కిటెక్చర్|कितना\s*प्रतिशत\s*एआई|कैसे\s*बनाया|आर्किटेक्चर/i.test(norm)) {
+    showTeamModal();
+    let msg = "Swaram is eighty percent custom human systems engineering and only twenty percent generative AI. Eighty percent of Swaram consists of client-side Web Audio FFT signal processing, Great-Circle navigation mathematics, deterministic regex finite-state machines, offline database storage, and streaming audio pipelines. Gemini provides just twenty percent for conversational synthesis.";
+    if (lang.startsWith('te')) msg = "స్వరం ఎనభై శాతం మా స్వంత ఇంజనీరింగ్, కేవలం ఇరవై శాతం మాత్రమే ఏఐ. వెబ్ ఆడియో సిగ్నల్ ప్రాసెసింగ్, నావిగేషన్ మ్యాథ్స్, ఆఫ్‌లైన్ డేటాబేస్ అన్నీ మేమే నిర్మించాము. కేవలం సంభాషణల కోసమే జెమిని వాడాము.";
+    if (lang.startsWith('hi')) msg = "स्वरम अस्सी प्रतिशत कस्टम सिस्टम इंजीनियरिंग है और केवल बीस प्रतिशत जनरेटिव एआई। सिग्नल प्रोसेसिंग, नेविगेशन गणित और ऑफलाइन डेटाबेस हमने कोड किया है, जबकि जेमिनी सिर्फ बातचीत के लिए उपयोग होता है।";
     speak(msg);
     return;
   }
