@@ -54,6 +54,20 @@ Swaram was engineered from the ground up to solve these exact challenges.
 * PyPDF extracts and cleans text into clean context chunks.
 * Ask *"Quiz me on my notes"* or *"Read page 3"* to learn hands-free through spoken dialog.
 
+### 4. Camera-to-Voice Multimodal Vision (Currency & Medicine Reader)
+* Powered by `POST /api/vision` and Gemini multimodal vision (`inline_data`).
+* Blind learners tap **"📷 Describe Camera"** or say *"What is in front of me?"*, *"What note is this?"*, or *"Read label"*.
+* Rear camera snaps a frame, shuts off hardware immediately, and provides spoken identification under 45 words:
+  - Identifies Indian currency notes (₹10, ₹20, ₹50, ₹100, ₹200, ₹500).
+  - Reads medicine packaging and food ingredient labels aloud.
+  - Warns of obstacles and describes the immediate physical environment in all 11 Indian languages.
+
+### 5. Multi-Sensory Haptics, Screen-Reader Trapping & Emergency SOS
+* **Haptic Vibration Patterns:** `navigator.vibrate` provides tactile cues in noisy classrooms: 50ms buzz (mic listening), `[40, 50, 40]` double-buzz (thinking), and 200ms buzz (error / offline).
+* **Full Keyboard & TalkBack Accessibility:** Semantic `<button id="voiceOrb">` with polite live regions, modal focus isolation (`aria-hidden="true"`), and global keyboard controls (`Space` to talk, `R` to repeat, `Esc` to stop).
+* **Spoken Speed Controls:** Natural commands *"speak slower"* (down to 0.75x), *"speak faster"* (up to 1.5x), *"repeat"*, and *"stop"*.
+* **One-Command Emergency SOS:** Voice command *"Emergency"* or *"అత్యవసరం"* acquires GPS coordinates, announces exact latitude/longitude aloud, and initiates an immediate one-tap phone dialer call to saved family or `112`.
+
 ---
 
 ## 📊 Performance Benchmarks (Empirical Test Results)
