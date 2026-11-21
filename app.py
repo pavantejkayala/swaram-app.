@@ -30,7 +30,7 @@ from flask import Flask, jsonify, request, send_from_directory, Response
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
-DEFAULT_GEMINI_KEY = ""  # Set via GEMINI_API_KEY environment variable
+DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or DEFAULT_GEMINI_KEY
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 GEMINI_URL = (
@@ -630,6 +630,63 @@ def chat():
     except Exception as exc:
         app.logger.error("Gemini error: %s", exc)
         return jsonify(error=str(exc)), 502
+
+
+@app.post("/api/vision")
+def vision_describe():
+    if not GEMINI_API_KEY:
+        return jsonify(error="GEMINI_API_KEY is not set on the server"), 500
+
+    data = request.get_json(force=True, silent=True) or {}
+    image_b64 = (data.get("image") or "").strip()
+    lang_code = data.get("lang", "en-IN")
+    lang_name = LANG_NAMES.get(lang_code, "English")
+
+    if not image_b64:
+        return jsonify(ok=False, error="No image provided"), 400
+
+    mime_type = "image/jpeg"
+    if "," in image_b64:
+        header, b64_clean = image_b64.split(",", 1)
+        if "image/png" in header:
+            mime_type = "image/png"
+        elif "image/webp" in header:
+            mime_type = "image/webp"
+    else:
+        b64_clean = image_b64
+
+    prompt = (
+        f"You are Swaram's assistive camera eye for a blind or visually impaired person. "
+        f"Analyze this image and describe it clearly in spoken {lang_name}. "
+        "Prioritize in this order: "
+        "1. If Indian currency notes or coins (rupees) are visible, identify the exact denomination clearly (e.g. 500 rupees note, 100 rupees note). "
+        "2. If a medicine bottle, food pack, or document with printed text is visible, read the prominent name, dosage, or title text aloud. "
+        "3. Otherwise, describe key objects, people, or obstacles directly in front. "
+        f"Strict rules: Reply in spoken {lang_name} under 45 words. Strictly plain speech: NO markdown, NO asterisks, NO bullets, NO emojis."
+    )
+
+    body = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {"mime_type": mime_type, "data": b64_clean.strip()}},
+                {"text": prompt}
+            ]
+        }],
+        "generationConfig": gen_config(temperature=0.2, maxOutputTokens=120)
+    }
+
+    try:
+        raw_desc = call_gemini(body, timeout=15)
+        clean_desc = clean_for_speech(raw_desc)
+        return jsonify(ok=True, description=clean_desc, lang=lang_code)
+    except Exception as exc:
+        app.logger.error("Vision API error: %s", exc)
+        fallback = {
+            "te-IN": "చిత్రం ప్రాసెస్ చేయలేకపోయాము, దయచేసి మళ్లీ ప్రయత్నించండి.",
+            "hi-IN": "तस्वीर समझ नहीं आई, कृपया दोबारा प्रयास करें।",
+            "en-IN": "Could not describe the camera image. Please try again."
+        }.get(lang_code, "Could not describe the camera image. Please try again.")
+        return jsonify(ok=False, error=str(exc), description=fallback), 502
 
 
 @app.post("/api/ui-strings")
