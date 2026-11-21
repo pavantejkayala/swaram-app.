@@ -9,10 +9,75 @@
 <link rel="icon" href="/icon-192.png">
 <style>
   :root { --bg:#000; --fg:#fff; --accent:#ffd400; --listen:#00e676; --think:#40c4ff; --speak:#ff6e40; }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg);
-    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  html, body { 
+    height: 100%; 
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0; 
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    background: var(--bg); 
+    color: var(--fg);
+    overscroll-behavior: none;
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif; 
+  }
   body { display: flex; flex-direction: column; user-select: none; cursor: pointer; }
+
+  /* Mobile Responsive Optimizations for Android & iPhone */
+  @media (max-width: 480px) {
+    .top-bar {
+      padding: 8px 10px !important;
+      gap: 6px !important;
+    }
+    .pill-select {
+      padding: 8px 6px !important;
+      font-size: 0.82rem !important;
+      max-width: 36vw !important;
+      text-overflow: ellipsis;
+    }
+    .icon-btn {
+      padding: 8px 10px !important;
+      font-size: 0.82rem !important;
+      white-space: nowrap !important;
+    }
+    .orb {
+      width: min(65vw, 230px) !important;
+      height: min(65vw, 230px) !important;
+      margin: 8px auto !important;
+    }
+    #state {
+      font-size: clamp(1.3rem, 5.5vw, 2rem) !important;
+      padding: 0 10px;
+    }
+    #text {
+      font-size: clamp(1.02rem, 3.8vw, 1.35rem) !important;
+      min-height: 2.8em !important;
+      padding: 0 12px;
+    }
+    #hint {
+      font-size: 0.92rem !important;
+      padding: 0 12px 14px !important;
+    }
+    .tools-drawer {
+      padding: 10px 8px !important;
+      gap: 6px !important;
+      max-height: 60vh !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tool-chip {
+      padding: 8px 12px !important;
+      font-size: 0.82rem !important;
+      min-height: 42px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+    }
+    #teamModal > div, #policyModal > div {
+      padding: 16px !important;
+      max-height: 90vh !important;
+      border-radius: 14px !important;
+    }
+  }
   header { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; justify-content: center; }
   .lang, .lockbtn { flex: 1; max-width: 200px; padding: 18px 8px; font-size: 1.4rem; font-weight: 700;
     color: var(--fg); background: #111; border: 3px solid #555; border-radius: 16px; cursor: pointer; }
@@ -1365,14 +1430,22 @@ async function describeCamera() {
 
   let stream = null;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: false
-    });
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+    } catch(hdCamErr) {
+      // Mobile fallback for budget phones with basic rear cameras
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+    }
 
     video.srcObject = stream;
     video.setAttribute('playsinline', 'true');
@@ -1834,6 +1907,26 @@ if (readTeamBtn) readTeamBtn.addEventListener('click', (e) => {
   speak('Project Swaram. Designed and built by Kayala Durga Pavan Teja and team as an accessibility-first voice assistant. Swaram is eighty percent custom human systems engineering and only twenty percent generative AI. Eighty percent consists of on-device Web Audio FFT signal processing, Great-Circle navigation mathematics, deterministic regex state machines, and streaming audio pipelines. Gemini provides twenty percent for conversational synthesis.');
 });
 
+// Mobile Audio Priming: Unlocks AudioContext & SpeechSynthesis on first phone screen touch
+let mobileAudioPrimed = false;
+function primeMobileAudio() {
+  if (mobileAudioPrimed) return;
+  mobileAudioPrimed = true;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0.01;
+      window.speechSynthesis.speak(u);
+    }
+  } catch(e) {}
+  startBackgroundKeepAlive();
+  requestScreenWakeLock();
+}
+document.addEventListener('touchstart', primeMobileAudio, { once: true, passive: true });
+document.addEventListener('pointerdown', primeMobileAudio, { once: true, passive: true });
+
 // Siri-style Background Keep-Alive Audio loop & Screen Wake Lock
 let keepAliveAudio = null;
 let screenWakeLock = null;
@@ -2181,17 +2274,41 @@ function listen(wakeWait = false) {
   
   rec.onerror = (e) => {
     if (silenceTimer) clearTimeout(silenceTimer);
+    // Android Chrome emits 'no-speech' whenever user pauses. Never buzz or kill active session!
+    if (e.error === 'no-speech') {
+      if (session && state === 'listening' && !got) {
+        setTimeout(() => {
+          if (session && state === 'listening' && !currentAudio) {
+            try { listen(false); } catch(err) {}
+          }
+        }, 150);
+      }
+      return;
+    }
+    if (e.error === 'aborted') {
+      return; // Normal intentional abort during speak() or barge-in
+    }
     haptic(200);
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      textEl.textContent = 'Microphone permission blocked. Please allow microphone in Chrome address bar.';
+      textEl.textContent = 'Microphone permission needed. Tap here to allow.';
       session = false;
       setState('idle');
+      openPolicy();
     }
   };
   
   rec.onend = () => {
     if (silenceTimer) clearTimeout(silenceTimer);
     if (!got && state === 'listening' && !isWakeWaiting) {
+      // If user tapped to talk (session active), auto-resume listening on mobile instead of dying abruptly
+      if (session && !currentAudio) {
+        setTimeout(() => {
+          if (session && state === 'listening' && !currentAudio) {
+            try { listen(false); } catch(err) {}
+          }
+        }, 200);
+        return;
+      }
       finishCapture();
       session = false; 
       setState('idle'); 
