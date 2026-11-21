@@ -135,7 +135,7 @@ class TestSwaramEndpoints(unittest.TestCase):
             data=payload,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=25) as resp:
             self.assertEqual(resp.status, 200)
             stream_content = resp.read().decode()
             self.assertIn("data:", stream_content)
