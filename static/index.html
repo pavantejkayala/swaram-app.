@@ -98,7 +98,7 @@
 
   <!-- 2. Hidden-by-Default Tools Drawer -->
   <div id="toolsDrawer" class="tools-drawer">
-    <button class="tool-chip" id="btnTtsEngine">⚡ Voice: Fast (1s)</button>
+    <button class="tool-chip" id="btnTtsEngine">⚡ Voice: Instant (0.05s)</button>
     <button class="tool-chip" id="btnWakeWord">🎙️ "Hey Swaram": ON</button>
     <button class="tool-chip" id="btnUploadNotes">📄 Upload Notes</button>
     <button class="tool-chip" id="btnProgress">📊 Progress: 0 Qs</button>
@@ -308,10 +308,7 @@ function parseOpen(text) {
       .replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
     return { name: 'YouTube', url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q || 'songs') };
   }
-  if (SEARCHV.test(t)) {
-    const q = t.replace(new RegExp(SEARCHV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
-    if (q) return { name: 'Google: ' + q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
-  }
+  // Search queries are directly answered by Swaram voice AI instead of opening Google Search popups
   if (!OPENV.test(t)) return null;
   const q = t.replace(new RegExp(OPENV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
   
@@ -323,8 +320,7 @@ function parseOpen(text) {
   }
   
   if (site) return { name: site[1], url: site[2] };
-  if (!q || q.split(' ').length > 4) return null;      // long sentence = a lesson request, not a command
-  return { name: q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
+  return null;
 }
 
 const LOCKW = /voice\s*lock|lock\s*(my\s*)?voice|(register|set\s*up|set)\s*(my\s*)?voice|वॉ[इय]स\s*लॉक|आवा\S{0,3}\s*लॉक|వాయిస్\s*లాక్|గొంతు\s*లాక్/i;
@@ -677,7 +673,7 @@ let session = false;      // true = auto-listen again after each spoken reply
 let rec = null;
 let speakId = 0;          // guards against stale onend events after cancel()
 let voices = [];
-let ttsEngine = localStorage.getItem('swaramTtsEngine') || 'fast'; // 'fast' (~0.3s) or 'neural' (~1.2s)
+let ttsEngine = localStorage.getItem('swaramTtsEngine') || 'instant'; // 'instant' (~0.05s), 'fast' (~0.8s), or 'neural' (~1.8s)
 
 // ---------- helpers ----------
 function loadVoices() { voices = speechSynthesis.getVoices(); }
@@ -685,8 +681,10 @@ speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
 
 function pickVoice(code) {
   const base = code.split('-')[0];
-  return voices.find(v => v.lang === code) ||
-         voices.find(v => v.lang.replace('_', '-').startsWith(base)) || null;
+  const list = voices.filter(v => v.lang === code || v.lang.replace('_', '-').startsWith(base));
+  if (!list.length) return null;
+  const preferred = list.find(v => /google|natural|online|premium/i.test(v.name));
+  return preferred || list[0];
 }
 
 let audioCtx;
@@ -1406,9 +1404,16 @@ function speak(text) {
     return;
   }
 
-  // Primary: Ultra-realistic Neural Human Voice
+  const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'instant');
+
+  // Instant Voice Engine (Browser Native Speech - 0.05s immediate playback, zero network delay)
+  if (engine === 'instant') {
+    fallbackBrowserSpeak(text, myId, done);
+    return;
+  }
+
+  // Network Audio Voice Engines (fast Google TTS ~0.8s, neural Edge-TTS ~1.8s)
   try {
-    const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'fast');
     const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&engine=${encodeURIComponent(engine)}&text=${encodeURIComponent(text)}`;
     const audio = new Audio(audioUrl);
     audio.playbackRate = speechRate;
@@ -1487,6 +1492,7 @@ function listen(wakeWait = false) {
   rec.maxAlternatives = 1;
   let got = false;
   let finalHeard = '';
+  let silenceTimer = null;
   
   rec.onstart = () => { 
     if (isWakeWaiting) {
@@ -1514,6 +1520,7 @@ function listen(wakeWait = false) {
     // Check for Wake Word "Hey Swaram" in background or idle state
     if (isWakeWaiting || (state === 'idle' && current)) {
       if (WAKE_WORD_RE.test(current)) {
+        if (silenceTimer) clearTimeout(silenceTimer);
         got = true;
         isWakeWaiting = false;
         chime();
@@ -1539,7 +1546,26 @@ function listen(wakeWait = false) {
     if (current) {
       textEl.textContent = '“' + current + '”';
     }
+
+    // Fast end-of-speech auto-commit (triggers after 600ms pause instead of Chrome's 2s delay)
+    if (silenceTimer) clearTimeout(silenceTimer);
+    if (!isWakeWaiting && state === 'listening' && current.length >= 3) {
+      silenceTimer = setTimeout(() => {
+        if (!got && state === 'listening') {
+          const sentence = (finalHeard || interim).trim();
+          if (sentence.length >= 2) {
+            got = true;
+            finalHeard = '';
+            const vec = finishCapture();
+            try { rec.stop(); } catch(err) {}
+            handle(sentence, vec);
+          }
+        }
+      }, 600);
+    }
+
     if (finalHeard.trim()) {
+      if (silenceTimer) clearTimeout(silenceTimer);
       got = true;
       const vec = finishCapture();
       const sentence = finalHeard.trim();
@@ -1550,6 +1576,7 @@ function listen(wakeWait = false) {
   };
   
   rec.onerror = (e) => {
+    if (silenceTimer) clearTimeout(silenceTimer);
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
       textEl.textContent = 'Microphone permission blocked. Please allow microphone in Chrome address bar.';
       session = false;
@@ -1558,6 +1585,7 @@ function listen(wakeWait = false) {
   };
   
   rec.onend = () => {
+    if (silenceTimer) clearTimeout(silenceTimer);
     if (!got && state === 'listening' && !isWakeWaiting) {
       finishCapture();
       session = false; 
@@ -1638,6 +1666,65 @@ async function handle(text, vec) {
 
   if (!navigator.onLine) {
     handleOffline(text);
+    return;
+  }
+
+  // Clean search prefixes so Swaram directly answers search queries
+  let cleanText = text.trim();
+  if (SEARCHV.test(cleanText)) {
+    const stripped = cleanText.replace(new RegExp(SEARCHV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+    if (stripped.length >= 2) cleanText = stripped;
+  }
+
+  // Instant Local Answers for Common Queries (0.01s - Zero latency)
+  const norm = cleanText.toLowerCase().trim().replace(/^[?.!,]+|[?.!,]+$/g, '');
+
+  // 1. Current Time
+  if (/\b(what time is it|what is the time|current time|tell me the time)\b|సమయం\s*(ఎంత|ఏమిటి)|టైమ్\s*ఎంత|समय\s*(क्या\s*है|बताओ)|टाइम\s*क्या/i.test(norm)) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit', hour12: true });
+    let msg = `The time is ${timeStr}.`;
+    if (lang.startsWith('te')) msg = `ప్రస్తుత సమయం ${timeStr}.`;
+    if (lang.startsWith('hi')) msg = `अभी का समय ${timeStr} है।`;
+    speak(msg);
+    return;
+  }
+
+  // 2. Current Date & Day
+  if (/\b(what is today's date|today's date|what date is it|what day is today)\b|ఈ\s*రోజు\s*తేదీ|ఈరోజు\s*ఏమిటి|आज\s*की\s*तारीख|आज\s*कौन\s*सा\s*दिन/i.test(norm)) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString(lang, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    let msg = `Today is ${dateStr}.`;
+    if (lang.startsWith('te')) msg = `ఈ రోజు ${dateStr}.`;
+    if (lang.startsWith('hi')) msg = `आज ${dateStr} है।`;
+    speak(msg);
+    return;
+  }
+
+  // 3. Instant Math (e.g. "what is 25 times 4", "50 plus 30", "100 divided by 5")
+  const mathMatch = norm.match(/^(?:what is |calculate |evaluate )?(\d+(?:\.\d+)?)\s*(\+|\-|\*|\/|x|times|plus|minus|divided by|భాగించు|గుణించు|కూడు|తీసివేయి|जोड़|घटा|गुणा|भाग)\s*(\d+(?:\.\d+)?)$/i);
+  if (mathMatch) {
+    const a = parseFloat(mathMatch[1]);
+    const op = mathMatch[2].toLowerCase();
+    const b = parseFloat(mathMatch[3]);
+    let ans = 0;
+    if (op === '+' || op === 'plus' || op === 'కూడు' || op === 'जोड़') ans = a + b;
+    else if (op === '-' || op === 'minus' || op === 'తీసివేయి' || op === 'घटा') ans = a - b;
+    else if (op === '*' || op === 'x' || op === 'times' || op === 'గుణించు' || op === 'गुणा') ans = a * b;
+    else if (op === '/' || op === 'divided by' || op === 'భాగించు' || op === 'भाग') ans = b !== 0 ? Math.round((a / b) * 100) / 100 : 'undefined';
+    let msg = `${a} ${op} ${b} is ${ans}.`;
+    if (lang.startsWith('te')) msg = `${a} మరియు ${b} ఫలితం ${ans}.`;
+    if (lang.startsWith('hi')) msg = `${a} और ${b} का उत्तर ${ans} है।`;
+    speak(msg);
+    return;
+  }
+
+  // 4. Who are you / greetings
+  if (/^(who are you|what is your name|what are you|నువ్వు ఎవరు|నీ పేరు ఏమిటి|तुम कौन हो|तुम्हारा नाम क्या है)$/i.test(norm)) {
+    let msg = "I am Swaram, your high-speed voice AI assistant for learning and accessibility.";
+    if (lang.startsWith('te')) msg = "నేను స్వరం, మీ కోసం వేగవంతమైన వాయిస్ అసిస్టెంట్.";
+    if (lang.startsWith('hi')) msg = "मैं स्वरम हूँ, आपकी तेज़ वॉइस एआई सहायक।";
+    speak(msg);
     return;
   }
 
@@ -1795,11 +1882,11 @@ async function handle(text, vec) {
         'Content-Type': 'application/json',
         'X-Session-ID': sessionId
       },
-      body: JSON.stringify({ message: text, lang, history })
+      body: JSON.stringify({ message: cleanText, lang, history })
     });
     const data = await r.json();
     if (!r.ok || !data.reply) throw new Error(data.error || 'bad reply');
-    history.push({ role: 'user', text }, { role: 'model', text: data.reply });
+    history.push({ role: 'user', text: cleanText }, { role: 'model', text: data.reply });
     progressData.questionsAnswered = (progressData.questionsAnswered || 0) + 1;
     updateProgressUI();
     speak(data.reply);
@@ -1869,16 +1956,25 @@ const btnTtsEngine = $('btnTtsEngine');
 
 function updateTtsEngineUI() {
   if (!btnTtsEngine) return;
-  btnTtsEngine.textContent = ttsEngine === 'fast' ? '⚡ Voice: Fast (1s)' : '🎙️ Voice: Neural (2s)';
+  if (ttsEngine === 'instant') {
+    btnTtsEngine.textContent = '⚡ Voice: Instant (0.05s)';
+  } else if (ttsEngine === 'fast') {
+    btnTtsEngine.textContent = '⚡ Voice: Fast (0.8s)';
+  } else {
+    btnTtsEngine.textContent = '🎙️ Voice: Neural (1.8s)';
+  }
 }
 if (btnTtsEngine) {
   updateTtsEngineUI();
   btnTtsEngine.addEventListener('click', (e) => {
     e.stopPropagation();
-    ttsEngine = ttsEngine === 'fast' ? 'neural' : 'fast';
+    if (ttsEngine === 'instant') ttsEngine = 'fast';
+    else if (ttsEngine === 'fast') ttsEngine = 'neural';
+    else ttsEngine = 'instant';
     localStorage.setItem('swaramTtsEngine', ttsEngine);
     updateTtsEngineUI();
-    speak(ttsEngine === 'fast' ? 'Fast voice active.' : 'Neural voice active.');
+    const ack = ttsEngine === 'instant' ? 'Instant voice active.' : (ttsEngine === 'fast' ? 'Fast voice active.' : 'Neural voice active.');
+    speak(ack);
   });
 }
 
