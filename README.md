@@ -1,200 +1,112 @@
-# Swaram (స్వరం) — Voice-First AI Skill Coach & Accessibility Assistant
+# Swaram (స్వరం)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Accessibility: WCAG 2.1 AAA](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AAA-brightgreen.svg)](https://www.w3.org/WAI/WCAG21/quickref/)
-[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Target: Assistive Tech](https://img.shields.io/badge/Domain-Assistive%20Tech%20%26%20Inclusion-purple.svg)]()
-[![Platform: Web PWA & Mobile](https://img.shields.io/badge/Platform-PWA%20%7C%20Chrome%20%7C%20Android-orange.svg)]()
+> A voice-first accessibility assistant and skill coach for visually impaired and hands-free users across 11 Indian regional languages.
 
-> **"Bridging the digital divide for India's 40+ million visually impaired citizens through human-like voice intelligence in native regional languages."**
-
-**Live App Deployment:** [https://swaram-app.onrender.com/](https://swaram-app.onrender.com/)  
-**GitHub Repository:** [https://github.com/pavantejkayala/swaram-app.](https://github.com/pavantejkayala/swaram-app.)
+**Live Application:** [https://swaram-app.onrender.com/](https://swaram-app.onrender.com/)  
+**Lead Developer:** Kayala Durga Pavan Teja & team
 
 ---
 
-## ⚖️ Hackathon Architecture Breakdown: 80% Systems Engineering vs 20% Generative AI
+## Overview
 
-> **"Swaram is NOT an AI wrapper. Over 80% of the codebase consists of human-written systems engineering, real-time audio digital signal processing, spatial geodesy mathematics, deterministic finite-state machines, and offline relational storage. Generative AI comprises only 20%, bounded strictly to conversational reasoning."**
+Existing mobile screen readers (such as TalkBack or NVDA) focus on reading screen elements line-by-line, which can be tedious for educational content and everyday tasks, especially in regional Indian languages. 
 
-| Architectural Subsystem | Implementation Details | Engineering Type | AI % vs Systems % |
-|---|---|---|---|
-| **1. Edge DSP & Biometrics** | Client-side Web Audio API FFT bin extraction, Mel-scale filterbanks, Euclidean distance speaker verification (`VP.K = 2.2, MIN = 2.0`). Zero biometric audio leaves device. | **Pure Client-Side DSP** | **0% AI &bull; 100% Systems** |
-| **2. Geodesic Spatial Navigation** | Great-Circle forward azimuth trigonometry (`atan2(sin(Δλ)·cos(φ2), ...)`), Haversine distance, and 8-point compass projection across 11 Indian regional languages. | **Pure Trigonometric Math** | **0% AI &bull; 100% Systems** |
-| **3. Multi-Language Intent Grammar** | Deterministic regular expression finite-state machines compiling voice triggers for phone dialing, contacts, emergency SOS, app launching, math, and PDF page seeking. | **Deterministic Automata** | **0% AI &bull; 100% Systems** |
-| **4. Pipelined Streaming Audio Pipeline** | Multi-tier synthesis (Edge-TTS + Google TTS fallback), sentence-by-sentence Server-Sent Events (SSE) reader, audio pre-fetching queue, and 800ms silence debouncer. | **Systems Engineering** | **0% AI &bull; 100% Systems** |
-| **5. Relational Persistence & Offline Engine** | SQLite database with WAL journaling, schema migrations, PBKDF2 password cryptography, session isolation, and client-side PWA service worker caching. | **Full-Stack Engineering** | **0% AI &bull; 100% Systems** |
-| **6. Conversational Q&A (The 20% AI Layer)** | Gemini 3.1 Flash Lite bounded strictly to 1–2 spoken sentences (`maxOutputTokens: 150`) used solely for open-domain questions when deterministic rules do not match. | **Bounded Generative AI** | **100% AI &bull; 0% Systems** |
+**Swaram** is built from the ground up as a conversational, voice-first companion that operates 100% eyes-free. Users can talk to Swaram in Telugu, Hindi, Tamil, Kannada, and 7 other Indian languages to study notes, practice voice quizzes, make phone calls, get voice directions, or read printed text and medicine labels using their camera.
 
 ---
 
-## 👥 Engineering Team & Contributor Credits
+## Core Features
 
-- **Kayala Durga Pavan Teja** — *Lead Full-Stack Architect, Speech AI Pipeline & Accessibility Engineering*
-- **Swaram Accessibility Group** — *User testing, blind school field study, regional dialect validation (Telugu & Hindi)*
-
----
-
-## 💡 The Human Origin Story: Why We Built Swaram
-
-Over **40 million visually impaired individuals in India** are largely excluded from the digital AI revolution. Mainstream screen readers like Android TalkBack or Windows NVDA are mechanical, robotic, and overwhelmingly English-centric. When visually impaired students try to study programming, prepare for competitive exams, or review university notes, existing tools simply read raw code symbols and punctuation without explaining the underlying concepts.
-
-### Field Research Insights:
-1. **The Language Barrier:** Most visually impaired students in government and regional colleges comprehend spoken lessons best in **Telugu, Hindi, Tamil, or Marathi**, but existing AI tools default to English.
-2. **Audio Fatigue:** Listening to monotone robotic screen readers for hours causes cognitive exhaustion. Natural human breathing, intonation, and regional warmth are essential for prolonged learning.
-3. **Eyes-Free Requirement:** Any button that requires visual hunting fails immediately. The entire UI must be operable via voice, screen-wide touch gestures, and auditory earcon chimes.
-
-Swaram was engineered from the ground up to solve these exact challenges.
+- **11 Indian Regional Languages:** Native voice support in Telugu, Hindi, English, Tamil, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, and Urdu.
+- **Hands-Free Wake Word:** Listens for *"Hey Swaram"* in the background using Screen Wake Lock to stay active without turning off the microphone.
+- **Voice Phone Calling:** Say *"Call Mom"* or *"Call 9876543210"* in English, Telugu, or Hindi. Integrates with the modern Contact Picker API (`navigator.contacts`) and provides one-tap dialing fallback for mobile browsers.
+- **Voice Maps & Compass Navigation:** Provides distance and 8-point compass directions (e.g. *"Charminar is 4.9 km away. Head South-West, about 7 minutes"*) using OpenStreetMap and OSRM routing.
+- **Camera-to-Voice Reader:** Describe what is in front of you, read printed book text, medicine labels, or recognize Indian currency notes via the camera.
+- **Audio Study Coach (PDF Notes):** Upload textbook chapters or study notes in PDF format and ask questions aloud.
+- **Voice Biometric Lock:** Client-side speaker verification using Web Audio API FFT frequency analysis to prevent background voices from triggering commands.
+- **Emergency SOS:** Announces the user's current GPS coordinates aloud and opens an immediate dialer link to call emergency services (112 / 100).
 
 ---
 
-## 🛠️ Key Engineering Innovations & Trade-Offs
+## Architecture & How It Works
 
-### 1. Sub-Second Voice Pipeline (~300ms Perceived Latency)
-* **The Problem:** Standard cloud voice pipelines (Audio $\rightarrow$ Cloud STT $\rightarrow$ Cloud LLM $\rightarrow$ Cloud TTS $\rightarrow$ Playback) typically suffer from 4 to 6 seconds of dead silence.
-* **Our Engineering Solution:**
-  - **Fast Silence Auto-Commit:** Replaced Chrome's default 2-second silence timer with a custom 600ms interim speech debouncer, cutting 1.4 seconds off the turn-taking delay.
-  - **Hybrid Dual-Engine TTS:** Coupled in-browser native `SpeechSynthesis` for instant (~50ms) playback with fallback to Microsoft Azure `Edge-TTS` and Google Translate TTS for HD regional intonation.
-  - **In-Memory Query LRU Cache:** Instant 8ms response times for high-frequency queries and knowledge lookups.
+Swaram uses a lightweight, client-focused architecture:
 
-### 2. Privacy-Preserving Edge Voice Biometrics (Voice Lock)
-* **The Problem:** Cloud-based speaker recognition requires streaming raw biometric audio files to external servers, creating privacy and surveillance risks for vulnerable users.
-* **Our Engineering Solution:**
-  - Implemented 100% client-side **Web Audio API FFT feature extraction** in JavaScript.
-  - Computes average spectral energy envelopes (MFCC-style sound shapes) directly on the learner's device.
-  - Compares cosine distance against the owner's enrolled profile locally (`K = 2.2, MIN = 2.0`). **Zero biometric data ever leaves the device.**
-
-### 3. Accessible PDF Study Coach with Chunked Context
-* Upload any college textbook, government exam notes, or PDF document.
-* PyPDF extracts and cleans text into clean context chunks.
-* Ask *"Quiz me on my notes"* or *"Read page 3"* to learn hands-free through spoken dialog.
-
-### 4. Camera-to-Voice Multimodal Vision (Currency & Medicine Reader)
-* Powered by `POST /api/vision` and Gemini multimodal vision (`inline_data`).
-* Blind learners tap **"📷 Describe Camera"** or say *"What is in front of me?"*, *"What note is this?"*, or *"Read label"*.
-* Rear camera snaps a frame, shuts off hardware immediately, and provides spoken identification under 45 words:
-  - Identifies Indian currency notes (₹10, ₹20, ₹50, ₹100, ₹200, ₹500).
-  - Reads medicine packaging and food ingredient labels aloud.
-  - Warns of obstacles and describes the immediate physical environment in all 11 Indian languages.
-
-### 5. Multi-Sensory Haptics, Screen-Reader Trapping & Emergency SOS
-* **Haptic Vibration Patterns:** `navigator.vibrate` provides tactile cues in noisy classrooms: 50ms buzz (mic listening), `[40, 50, 40]` double-buzz (thinking), and 200ms buzz (error / offline).
-* **Full Keyboard & TalkBack Accessibility:** Semantic `<button id="voiceOrb">` with polite live regions, modal focus isolation (`aria-hidden="true"`), and global keyboard controls (`Space` to talk, `R` to repeat, `Esc` to stop).
-* **Spoken Speed Controls:** Natural commands *"speak slower"* (down to 0.75x), *"speak faster"* (up to 1.5x), *"repeat"*, and *"stop"*.
-* **One-Command Emergency SOS:** Voice command *"Emergency"* or *"అత్యవసరం"* acquires GPS coordinates, announces exact latitude/longitude aloud, and initiates an immediate one-tap phone dialer call to saved family or `112`.
-
----
-
-## 📊 Performance Benchmarks (Empirical Test Results)
-
-Benchmark run on mobile 4G LTE network using `tests/benchmark_latency.py`:
-
-| Query Type | Input Query | Target SLA | Measured Latency | Status |
-|---|---|---|---|---|
-| **Identity / Creator** | *"Who made you?"* | $< 0.10s$ | **0.012s** | ⚡ Instant Local |
-| **Current Time** | *"What time is it?"* | $< 0.10s$ | **0.008s** | ⚡ Instant Local |
-| **Arithmetic** | *"What is 25 times 4?"* | $< 0.10s$ | **0.015s** | ⚡ Instant Local |
-| **Regional Search (Telugu)** | *"తెలంగాణ రాజధాని ఏమిటి?"* | $< 3.00s$ | **0.550s** | ✅ Passed |
-| **Factual Knowledge** | *"Who is the president of India?"* | $< 2.00s$ | **0.320s** | ✅ Passed |
-| **General Science** | *"What is photosynthesis?"* | $< 2.00s$ | **0.910s** | ✅ Passed |
-
----
-
-## 🏗️ System Architecture
-
-```mermaid
-flowchart TD
-    User([Learner Voice & Eyes-Free Gestures]) -->|Web Speech API| Client[Swaram PWA Client]
-    
-    subgraph ClientLayer [Client-Side Edge Processing]
-        Client -->|Silence Debounce 600ms| FastSTT[Speech End Detector]
-        Client -->|Web Audio API FFT| EdgeBio[Local Voice Lock Biometrics]
-        Client -->|Auditory Earcons| SoundFX[Dual-Tone Chimes & Chords]
-        Client -->|Local Math & Time| LocalAns[Instant Local Answer Engine]
-    end
-    
-    FastSTT -->|REST APIs| FlaskServer[Flask Backend :5050]
-    
-    subgraph ServerLayer [Server & AI Engine]
-        FlaskServer -->|SQLite WAL Mode| DB[(swaram.db: User, Notes & Progress)]
-        FlaskServer -->|Failover Pipeline| Gemini[Google Gemini 3.1 Flash Lite]
-        FlaskServer -->|Document Chunking| PDFEngine[PyPDF Document Extractor]
-        FlaskServer -->|Neural Regional Voice| EdgeTTS[Microsoft Azure Neural Speech]
-    end
-    
-    Gemini -->|Spoken Response < 20 Words| AudioPlayer[Hybrid Speech Synthesizer]
-    EdgeTTS -->|MP3 Audio Stream| AudioPlayer
-    AudioPlayer -->|Warm Human Voice| Speaker([Learner Hears Answer])
+```
+[ Client (Browser) ]
+  ├── Web Speech API (Continuous SpeechRecognition & Synthesizer)
+  ├── Web Audio API (Real-time FFT audio spectrum & voiceprint check)
+  ├── Geolocation & Screen Wake Lock API
+  └── Contact Picker API (Phone dialing integration)
+         │
+         ▼ HTTP / SSE (Fast sentence streaming)
+[ Backend (Flask / Python) ]
+  ├── SQLite Database (WAL mode - user notes, sessions, progress)
+  ├── Spatial Math (Haversine distance & forward azimuth bearing)
+  ├── Audio Synthesizer (Edge-TTS neural voices + Google TTS fallback)
+  └── Conversational Model (Google Gemini Flash for spoken explanations)
 ```
 
 ---
 
-## ♿ WCAG 2.1 AAA Accessibility Compliance
+## Project Structure
 
-Swaram was designed strictly following the **Web Content Accessibility Guidelines (WCAG) 2.1 Level AAA**:
-
-1. **Rule 1.4.6 (Contrast Enhanced):** Background is pure `#000000` with high-contrast `#ffd400` (yellow) and `#00e676` (green), achieving a contrast ratio $> 14:1$ (exceeding the 7:1 AAA requirement).
-2. **Rule 2.5.5 (Target Size):** All interactive touch zones and buttons are at least 48x48 CSS pixels for tremors or partial blindness.
-3. **Auditory Earcons:** Every state transition has a unique pitch signature:
-   - *Mic Active / Listening:* Rising chime (`440Hz → 880Hz`)
-   - *Mic Paused:* Soft descending tone (`660Hz → 330Hz`)
-   - *Quiz Correct Answer:* Triumphant major chord (`C5 → E5 → G5`)
-   - *Wake Word Acknowledged:* High dual-tone bell (`880Hz → 1318Hz`)
-4. **Inaudible Audio Keep-Alive:** Runs a micro-volume oscillator (`gain: 0.0001`) preventing mobile browsers from putting background audio threads to sleep when the phone is in a pocket.
-
----
-
-## 🧪 Automated Test Suite
-
-We maintain a complete test suite covering backend integrity, AI reasoning, multi-language support, and speech synthesis:
-
-```bash
-# Run the end-to-end integration test suite
-python tests/test_suite.py
-
-# Run the real-time voice latency benchmark
-python tests/benchmark_latency.py
-```
-
-### Test Suite Output:
 ```text
-=================================================================
-RUNNING SWARAM INTEGRATION TEST SUITE
-Lead Developer: Kayala Durga Pavan Teja
-=================================================================
-test_01_health_check ... ok [SQLite active, API key loaded]
-test_02_chat_english ... ok [Spoken English verified under 30 words]
-test_03_chat_telugu  ... ok [Native Telugu script verified]
-test_04_tts_generation ... ok [12,864 audio bytes generated]
-test_05_quiz_engine  ... ok [Dynamic voice quiz questions generated]
------------------------------------------------------------------
-Ran 5 tests in 2.995s | ALL TESTS PASSED (OK)
+swaram/
+├── app.py                # Flask server, routes, SQLite helpers, TTS & Gemini APIs
+├── requirements.txt      # Python dependencies (Flask, edge-tts, pypdf, requests)
+├── Procfile              # Production deployment command (Gunicorn)
+├── static/
+│   ├── index.html        # Single-row zero-scroll voice interface & PWA client
+│   └── 404.html          # Fallback error page
+└── tests/
+    └── test_suite.py     # Automated test suite (health, chat, TTS, directions, vision)
 ```
 
 ---
 
-## 🚀 Quickstart & Local Installation
+## Getting Started Locally
 
-### Prerequisites:
-- Python 3.10 or higher
-- Google Chrome (recommended for full Web Speech & SpeechSynthesis API support)
+### Prerequisites
+- Python 3.10+
+- Modern Chromium browser (Chrome or Edge) for Web Speech API support
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/pavantejkayala/swaram-app.git
-cd swaram-app
+### Installation
 
-# 2. Install dependencies
-pip install -r requirements.txt
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/pavantejkayala/swaram-app..git
+   cd swaram-app.
+   ```
 
-# 3. Launch the development server
-python run_server.py
-```
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Open **`http://localhost:5050`** in your browser. Tap anywhere on screen or say **"Hey Swaram"** to start learning!
+3. **Set your Gemini API key:**
+   ```bash
+   export GEMINI_API_KEY="your-api-key-here"
+   ```
+
+4. **Start the application:**
+   ```bash
+   python app.py
+   ```
+   Open `http://localhost:5050` in Chrome.
+
+5. **Run test suite:**
+   ```bash
+   python tests/test_suite.py
+   ```
 
 ---
 
-## 📜 License
+## Team & Credits
 
-This project is licensed under the **MIT License** — feel free to use, modify, and distribute for educational and assistive technology initiatives.
+- **Kayala Durga Pavan Teja** — Lead Developer & Systems Architect
+- Developed for the National Accessibility Hackathon.
+
+## License
+
+This project is licensed under the MIT License.
