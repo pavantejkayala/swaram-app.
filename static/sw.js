@@ -1,5 +1,5 @@
 // Minimal service worker: makes the app installable and caches the shell.
-const CACHE = 'swaram-v16';
+const CACHE = 'swaram-v17';
 const SHELL = ['/', '/404.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
