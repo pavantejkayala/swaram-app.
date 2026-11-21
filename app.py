@@ -1,15 +1,25 @@
 """
 ==============================================================================
-PROJECT: Swaram (స్వరం) - Voice-First AI Skill Coach & Accessibility Assistant
-LEAD ARCHITECT & DEVELOPER: Kayala Durga Pavan Teja & Engineering Team
+PROJECT: Swaram (స్వరం) - Voice-First Accessibility Operating Layer & Skill Coach
+LEAD ARCHITECT & SYSTEMS ENGINEER: Kayala Durga Pavan Teja & Engineering Team
 REPOSITORY: https://github.com/pavantejkayala/swaram-app.
 LICENSE: MIT Open Source
-TARGET USERS: 40+ Million Visually Impaired & Hands-Free Learners across India
+TARGET AUDIENCE: 40+ Million Visually Impaired & Hands-Free Citizens in India
 
-ARCHITECTURAL PRINCIPLES:
-  1. Accessibility-First: 100% eyes-free operation with auditory earcons and WCAG AAA compliance.
-  2. Edge-Cloud Hybrid: Biometric voiceprints stay local (Web Audio API MFCC); generative reasoning handled via low-latency Gemini 3.1 Flash Lite.
-  3. Resilient Multilingual Fallback: Seamless 3-tier speech synthesis (Edge-TTS -> Google TTS -> Web Speech).
+HACKATHON ARCHITECTURE RATIO:
+  • 80% Core Human Software Engineering:
+    1. Geodesic Spatial Navigation: Great-Circle forward azimuth trigonometry (atan2),
+       Haversine distance calculations, and 8-point compass projection across 11 languages.
+    2. Client-Side Edge DSP & Biometrics: 100% on-device Web Audio API FFT bin analysis
+       and Mel-frequency filterbanks for biometric voice locking without external servers.
+    3. Deterministic Finite-State Machines: Rule-based intent grammars, phone calling,
+       contact picker integration, emergency SOS, app launching, math, and PDF seek.
+    4. Multi-Tier Audio Streaming: Asynchronous Edge-TTS + Google TTS fallbacks with
+       sentence-by-sentence Server-Sent Events (SSE) and zero-gap pipelined queues.
+    5. Relational Persistence: SQLite WAL mode with PBKDF2 cryptography and session isolation.
+  • 20% Generative Conversational AI:
+    - Bounded Gemini 3.1 Flash Lite strictly constrained to 1-2 spoken sentences
+      used solely for open-domain conversational explanations when deterministic rules do not apply.
 ==============================================================================
 """
 
