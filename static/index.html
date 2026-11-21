@@ -166,7 +166,12 @@
 
   <!-- 2. Hidden-by-Default Tools Drawer -->
   <div id="toolsDrawer" class="tools-drawer" aria-hidden="true">
-    <button class="tool-chip" id="btnDescribeCamera" aria-label="Describe Camera or Read Currency">📷 Describe Camera</button>
+    <button class="tool-chip" id="btnDescribeCamera" aria-label="Describe Camera">📷 Describe Camera</button>
+    <button class="tool-chip" id="btnScanMedicine" aria-label="Scan Medicine and Expiry Date">💊 Check Medicine</button>
+    <button class="tool-chip" id="btnScanCurrency" aria-label="Read Indian Currency and Bills">💵 Read Currency</button>
+    <button class="tool-chip" id="btnDetectColor" aria-label="Detect Object Color and Room Light">🎨 Color & Light</button>
+    <button class="tool-chip" id="btnDeviceStatus" aria-label="Speak Battery, Time and Date">🔋 Battery & Time</button>
+    <button class="tool-chip" id="btnListReminders" aria-label="View Active Reminders">⏰ Reminders</button>
     <button class="tool-chip" id="btnEmergencySos" aria-label="Emergency SOS call and announce location">🚨 Emergency SOS</button>
     <button class="tool-chip" id="btnTtsEngine">⚡ Voice: Instant (0.05s)</button>
     <button class="tool-chip" id="btnWakeWord">🎙️ "Hey Swaram": ON</button>
@@ -1737,17 +1742,39 @@ document.addEventListener('touchend', (e) => {
 // ================= CAMERA-TO-VOICE & EMERGENCY SOS =================
 let isCameraCapturing = false;
 
-async function describeCamera() {
+async function describeCamera(mode = 'general') {
   if (isCameraCapturing) return;
   isCameraCapturing = true;
 
-  const startAck = {
-    'te-IN': 'కెమెరా ప్రారంభమవుతోంది, దయచేసి కెమెరా ముందు నోటు లేదా వస్తువు ఉంచండి...',
-    'hi-IN': 'कैमरा शुरू हो रहा है, कृपया सामने नोट या वस्तु रखिए...',
-    'en-IN': 'Opening camera. Please hold steady in front of the currency note, medicine, or object...'
-  }[lang] || 'Opening camera. Please hold steady in front of the camera...';
+  let startAck = '';
+  if (mode === 'medicine') {
+    startAck = {
+      'te-IN': 'మందుల ప్యాకెట్ లేదా సీసాను కెమెరా ముందు ఉంచండి, వివరాలు చదువుతున్నాను...',
+      'hi-IN': 'दवा का पैकेट या बोतल कैमरे के सामने रखिए, जांच कर रहे हैं...',
+      'en-IN': 'Opening camera. Please hold the medicine strip or bottle steady...'
+    }[lang] || 'Opening camera. Please hold the medicine steady...';
+  } else if (mode === 'currency') {
+    startAck = {
+      'te-IN': 'కరెన్సీ నోటు లేదా బిల్లును కెమెరా ముందు ఉంచండి, లెక్కిస్తున్నాను...',
+      'hi-IN': 'नोट या बिल कैमरे के सामने रखिए, जांच कर रहे हैं...',
+      'en-IN': 'Opening camera. Please hold the currency note or bill steady...'
+    }[lang] || 'Opening camera. Please hold the currency note or bill steady...';
+  } else if (mode === 'color') {
+    startAck = {
+      'te-IN': 'కెమెరాను వస్తువు వైపు ఉంచండి, రంగు మరియు వెలుతురు గుర్తిస్తున్నాను...',
+      'hi-IN': 'कैमरे को वस्तु की तरफ रखिए, रंग और रोशनी जांच रहे हैं...',
+      'en-IN': 'Opening camera. Pointing at the object to detect color and lighting...'
+    }[lang] || 'Opening camera to detect color and lighting...';
+  } else {
+    startAck = {
+      'te-IN': 'కెమెరా ప్రారంభమవుతోంది, దయచేసి కెమెరా ముందు వస్తువు లేదా నోటు ఉంచండి...',
+      'hi-IN': 'कैमरा शुरू हो रहा है, कृपया सामने वस्तु या नोट रखिए...',
+      'en-IN': 'Opening camera. Please hold steady in front of the camera...'
+    }[lang] || 'Opening camera. Please hold steady in front of the camera...';
+  }
 
-  textEl.textContent = '📷 ' + startAck;
+  const icon = mode === 'medicine' ? '💊 ' : mode === 'currency' ? '💵 ' : mode === 'color' ? '🎨 ' : '📷 ';
+  textEl.textContent = icon + startAck;
   speak(startAck);
   setState('thinking');
 
@@ -1766,7 +1793,6 @@ async function describeCamera() {
         audio: false
       });
     } catch(hdCamErr) {
-      // Mobile fallback for budget phones with basic rear cameras
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' } },
         audio: false
@@ -1800,7 +1826,7 @@ async function describeCamera() {
     const res = await fetch('/api/vision', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Data, lang })
+      body: JSON.stringify({ image: base64Data, lang, mode })
     });
 
     const data = await res.json();
@@ -1809,7 +1835,7 @@ async function describeCamera() {
     }
 
     const desc = data.description || 'No description available.';
-    textEl.textContent = desc;
+    textEl.textContent = icon + desc;
     speak(desc);
   } catch (err) {
     console.error('Camera vision error:', err);
@@ -1827,6 +1853,349 @@ async function describeCamera() {
   } finally {
     isCameraCapturing = false;
   }
+}
+
+// ================= HANDS-FREE DEVICE STATUS (BATTERY, TIME, DATE) =================
+async function speakBatteryStatus() {
+  if (typeof navigator.getBattery === 'function') {
+    try {
+      const b = await navigator.getBattery();
+      const pct = Math.round(b.level * 100);
+      const charging = b.charging;
+      let msg = `Battery is at ${pct} percent${charging ? ' and currently charging' : ''}.`;
+      if (lang.startsWith('te')) {
+        msg = `బ్యాటరీ ${pct} శాతం ఉంది${charging ? ' మరియు ఛార్జ్ అవుతోంది' : ''}.`;
+      } else if (lang.startsWith('hi')) {
+        msg = `बैटरी ${pct} प्रतिशत है${charging ? ' और चार्ज हो रही है' : ''}।`;
+      }
+      textEl.textContent = '🔋 ' + msg;
+      speak(msg);
+      return;
+    } catch (e) {
+      console.warn('Battery API error:', e);
+    }
+  }
+  let fallback = 'Battery status is not supported on this browser.';
+  if (lang.startsWith('te')) fallback = 'ఈ బ్రౌజర్‌లో బ్యాటరీ స్థితి అందుబాటులో లేదు.';
+  if (lang.startsWith('hi')) fallback = 'इस ब्राउज़र पर बैटरी स्थिति उपलब्ध नहीं है।';
+  textEl.textContent = '🔋 ' + fallback;
+  speak(fallback);
+}
+
+function speakTimeStatus() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit', hour12: true });
+  let msg = `The time is ${timeStr}.`;
+  if (lang.startsWith('te')) msg = `ప్రస్తుత సమయం ${timeStr}.`;
+  if (lang.startsWith('hi')) msg = `अभी का समय ${timeStr} है।`;
+  textEl.textContent = '🕒 ' + msg;
+  speak(msg);
+}
+
+function speakDateStatus() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(lang, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  let msg = `Today is ${dateStr}.`;
+  if (lang.startsWith('te')) msg = `ఈ రోజు ${dateStr}.`;
+  if (lang.startsWith('hi')) msg = `आज ${dateStr} है।`;
+  textEl.textContent = '📅 ' + msg;
+  speak(msg);
+}
+
+// ================= SPOKEN VOICE REMINDERS SUBSYSTEM =================
+const REMINDERS_KEY = 'swaramReminders';
+const REMINDV = /\b(remind\s*me(\s*to)?|set\s*(a\s*)?reminder(\s*to|\s*for)?|set\s*(a\s*)?timer(\s*to|\s*for)?|alert\s*me(\s*to)?)\b|గుర్తు\s*చేయి|జ్ఞాపకం\s*చేయి|యాది\s*చేయి|याद\s*(दिलाओ|दिलाना|रखना)|रिमाइंडर\s*(लगाओ|सेट)/i;
+let activeReminders = [];
+
+function loadReminders() {
+  try {
+    return JSON.parse(localStorage.getItem(REMINDERS_KEY)) || [];
+  } catch(e) { return []; }
+}
+
+function saveReminders(rems) {
+  try {
+    localStorage.setItem(REMINDERS_KEY, JSON.stringify(rems));
+  } catch(e) {}
+}
+
+function playReminderChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    
+    // Bell Tone 1: 587.33 Hz (D5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.35, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    // Bell Tone 2: 880 Hz (A5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.2);
+    gain2.gain.setValueAtTime(0.4, now + 0.2);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.2);
+    osc2.stop(now + 0.7);
+
+    setTimeout(() => { try { ctx.close(); } catch(e){} }, 1000);
+  } catch(e) {
+    console.warn('Reminder chime audio error:', e);
+  }
+}
+
+function showReminderAlertModal(task) {
+  let modal = $('reminderAlertModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'reminderAlertModal';
+    modal.setAttribute('role', 'alertdialog');
+    modal.setAttribute('aria-live', 'assertive');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="background:#161616; border:3px solid #ffd400; border-radius:24px; max-width:400px; width:100%; padding:28px 20px; text-align:center; box-shadow:0 0 50px rgba(255,212,0,0.5);">
+      <div style="font-size:3.8rem; margin-bottom:10px; line-height:1;">⏰</div>
+      <div style="font-size:1.6rem; font-weight:800; color:#ffd400; margin-bottom:8px;">Reminder Alert!</div>
+      <div style="font-size:1.3rem; color:#fff; font-weight:700; margin-bottom:24px; line-height:1.4;">${task}</div>
+      <button id="dismissReminderAlertBtn" style="width:100%; padding:16px; background:#ffd400; color:#000; font-size:1.2rem; font-weight:bold; border:none; border-radius:14px; cursor:pointer; box-shadow:0 4px 18px rgba(255,212,0,0.5);">
+        ✅ Dismiss Reminder
+      </button>
+    </div>
+  `;
+  modal.style.display = 'flex';
+  $('dismissReminderAlertBtn').onclick = () => {
+    modal.style.display = 'none';
+    stopAudio();
+  };
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      stopAudio();
+    }
+  };
+  setTimeout(() => {
+    if (modal && modal.style.display === 'flex') modal.style.display = 'none';
+  }, 30000);
+}
+
+function fireReminder(rem) {
+  activeReminders = activeReminders.filter(r => r.id !== rem.id);
+  saveReminders(activeReminders);
+
+  playReminderChime();
+  haptic([120, 80, 120, 80, 250]);
+
+  let alertMsg = `Reminder: ${rem.task}!`;
+  if (lang.startsWith('te')) alertMsg = `రిమైండర్: ${rem.task}!`;
+  if (lang.startsWith('hi')) alertMsg = `रिमाइंडर: ${rem.task}!`;
+
+  textEl.textContent = '⏰ ' + alertMsg;
+  speak(alertMsg);
+  showReminderAlertModal(rem.task);
+}
+
+function scheduleReminderTimer(rem) {
+  const now = Date.now();
+  const msLeft = rem.dueTime - now;
+  if (msLeft <= 0) {
+    fireReminder(rem);
+    return;
+  }
+  setTimeout(() => {
+    fireReminder(rem);
+  }, msLeft);
+}
+
+function parseVoiceReminder(rawText) {
+  const norm = wordsToDigits(rawText || '').trim();
+
+  if (/\b(what\s*are\s*my\s*reminders|list\s*reminders|show\s*reminders|my\s*reminders)\b|నా\s*రిమైండర్లు|రిమైండర్\s*లిస్ట్|मेरे\s*रिमाइंडर/i.test(norm)) {
+    return { type: 'list' };
+  }
+
+  let sec = 0;
+  let durationDesc = '';
+
+  const m_h = norm.match(/(\d+)\s*(?:hours?|hrs?|గంటలు|గంటల్లో|గంట|घंटे|घंटा)/i);
+  const m_m = norm.match(/(\d+)\s*(?:minutes?|mins?|నిమిషాలు|నిమిషాల్లో|నిమిషం|మినిట్స్|मिनट)/i);
+  const m_s = norm.match(/(\d+)\s*(?:seconds?|secs?|సెకన్లు|సెకన్లలో|సెకను|सेकंड|सैकंड)/i);
+
+  if (m_h) {
+    const h = parseInt(m_h[1], 10);
+    sec += h * 3600;
+    durationDesc += `${h} hour${h > 1 ? 's' : ''} `;
+  }
+  if (m_m) {
+    const m = parseInt(m_m[1], 10);
+    sec += m * 60;
+    durationDesc += `${m} minute${m > 1 ? 's' : ''} `;
+  }
+  if (m_s) {
+    const s = parseInt(m_s[1], 10);
+    sec += s;
+    durationDesc += `${s} second${s > 1 ? 's' : ''} `;
+  }
+
+  durationDesc = durationDesc.trim();
+  if (sec === 0) {
+    sec = 60;
+    durationDesc = '1 minute';
+  }
+
+  let clean = norm;
+  clean = clean.replace(new RegExp(REMINDV.source, 'gi'), ' ');
+  clean = clean.replace(/\b(in|after|for)\s*\d+\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/gi, ' ');
+  clean = clean.replace(/\d+\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/gi, ' ');
+  clean = clean.replace(/\d+\s*(నిమిషాలు|నిమిషాల్లో|నిమిషం|మినిట్స్|సెకన్లు|సెకన్లలో|గంటలు|గంటల్లో|గంట)/gi, ' ');
+  clean = clean.replace(/\d+\s*(मिनट|सेकंड|घंटे|घंटा|में|के\s*बाद)/gi, ' ');
+  clean = clean.replace(/\b(to|that|about|please|plz)\b/gi, ' ');
+  clean = clean.replace(/(గుర్తు\s*చేయి|జ్ఞాపకం\s*చేయి|యాది\s*చేయి|याद\s*(दिलाओ|दिलाना)|में|के\s*बाद)/gi, ' ');
+  clean = clean.replace(/^(में|के\s*बाद)\s*/gi, ' ');
+  clean = clean.replace(/\s+/g, ' ').trim();
+
+  let task = clean;
+  if (!task || task.length < 2) {
+    task = 'your reminder';
+  }
+  task = task.charAt(0).toUpperCase() + task.slice(1);
+
+  return {
+    type: 'create',
+    task: task,
+    seconds: sec,
+    durationDesc: durationDesc
+  };
+}
+
+function handleVoiceReminder(text) {
+  const parsed = parseVoiceReminder(text);
+  if (!parsed) {
+    let msg = 'Could not understand reminder. Try saying: Remind me to take medicine in 5 minutes.';
+    if (lang.startsWith('te')) msg = 'రిమైండర్ అర్థం కాలేదు. ఉదాహరణకు: 5 నిమిషాల్లో మందులు వేసుకోవాలని గుర్తుచేయి అని చెప్పండి.';
+    if (lang.startsWith('hi')) msg = 'रिमाइंडर समझ नहीं आया। ऐसे कहें: 5 मिनट में दवा लेना याद दिलाना।';
+    textEl.textContent = '⏰ ' + msg;
+    speak(msg);
+    return;
+  }
+
+  if (parsed.type === 'list') {
+    listRemindersAloud();
+    return;
+  }
+
+  const rem = {
+    id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    task: parsed.task,
+    dueTime: Date.now() + (parsed.seconds * 1000),
+    durationDesc: parsed.durationDesc
+  };
+
+  activeReminders.push(rem);
+  saveReminders(activeReminders);
+  scheduleReminderTimer(rem);
+
+  let confirmMsg = `Okay, I will remind you to ${parsed.task} in ${parsed.durationDesc}.`;
+  if (lang.startsWith('te')) confirmMsg = `సరే, ${parsed.durationDesc} లో ${parsed.task} గుర్తుచేస్తాను.`;
+  if (lang.startsWith('hi')) confirmMsg = `ठीक है, मैं आपको ${parsed.durationDesc} में ${parsed.task} याद दिलाऊंगा।`;
+
+  textEl.textContent = '⏰ ' + confirmMsg;
+  speak(confirmMsg);
+}
+
+function listRemindersAloud() {
+  const now = Date.now();
+  const pending = activeReminders.filter(r => r.dueTime > now);
+  if (pending.length === 0) {
+    let msg = 'You have no active reminders.';
+    if (lang.startsWith('te')) msg = 'మీకు ఎటువంటి యాక్టివ్ రిమైండర్‌లు లేవు.';
+    if (lang.startsWith('hi')) msg = 'आपका कोई सक्रिय रिमाइंडर नहीं है।';
+    textEl.textContent = '⏰ ' + msg;
+    speak(msg);
+    return;
+  }
+  let items = pending.map(r => {
+    const minsLeft = Math.max(1, Math.round((r.dueTime - now) / 60000));
+    return `${r.task} in ${minsLeft} minute${minsLeft > 1 ? 's' : ''}`;
+  }).join(', ');
+  let msg = `You have ${pending.length} reminder${pending.length > 1 ? 's' : ''}: ${items}.`;
+  if (lang.startsWith('te')) msg = `మీకు ${pending.length} రిమైండర్‌లు ఉన్నాయి: ${items}.`;
+  if (lang.startsWith('hi')) msg = `आपके ${pending.length} रिमाइंडर हैं: ${items}।`;
+  textEl.textContent = '⏰ ' + msg;
+  speak(msg);
+}
+
+function showRemindersListModal() {
+  const now = Date.now();
+  const pending = activeReminders.filter(r => r.dueTime > now);
+  let modal = $('remindersListModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'remindersListModal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.88); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;';
+    document.body.appendChild(modal);
+  }
+  let itemsHtml = '';
+  if (pending.length === 0) {
+    itemsHtml = '<div style="color:#aaa; text-align:center; padding:20px;">No active reminders.<br><small style="color:#777;">Say "Remind me to take medicine in 5 minutes"</small></div>';
+  } else {
+    for (const rem of pending) {
+      const minsLeft = Math.max(1, Math.round((rem.dueTime - now) / 60000));
+      itemsHtml += `
+        <div style="background:#202020; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div>
+            <div style="font-weight:bold; font-size:1.05rem; color:#fff;">${rem.task}</div>
+            <div style="color:#ffd400; font-size:0.85rem;">⏰ Due in ~${minsLeft} min (${rem.durationDesc})</div>
+          </div>
+          <button class="delete-rem-btn" data-id="${rem.id}" style="background:#333; color:#ff5252; border:1px solid #ff5252; border-radius:8px; padding:6px 10px; cursor:pointer; font-weight:bold;">✖</button>
+        </div>
+      `;
+    }
+  }
+
+  modal.innerHTML = `
+    <div style="background:#161616; border:2px solid #ffd400; border-radius:22px; max-width:420px; width:100%; padding:22px; color:#fff; box-shadow:0 0 35px rgba(255,212,0,0.35);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #333; padding-bottom:10px;">
+        <h3 style="margin:0; font-size:1.25rem; color:#ffd400;">⏰ Active Voice Reminders (${pending.length})</h3>
+        <button id="closeRemindersListBtn" style="background:none; border:none; color:#aaa; font-size:1.6rem; cursor:pointer;">&times;</button>
+      </div>
+      <div style="max-height:55vh; overflow-y:auto; margin-bottom:16px;">
+        ${itemsHtml}
+      </div>
+      <button id="remindersDoneBtn" style="width:100%; padding:12px; background:#ffd400; color:#000; font-weight:bold; border:none; border-radius:12px; cursor:pointer;">
+        Done
+      </button>
+    </div>
+  `;
+  modal.style.display = 'flex';
+  $('closeRemindersListBtn').onclick = () => { modal.style.display = 'none'; };
+  $('remindersDoneBtn').onclick = () => { modal.style.display = 'none'; };
+  modal.querySelectorAll('.delete-rem-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      activeReminders = activeReminders.filter(r => r.id !== id);
+      saveReminders(activeReminders);
+      showRemindersListModal();
+    };
+  });
+  listRemindersAloud();
 }
 
 function triggerEmergencySos() {
@@ -2753,25 +3122,27 @@ async function handle(text, vec) {
     return;
   }
 
-  // 1. Current Time
-  if (/\b(what time is it|what is the time|current time|tell me the time)\b|సమయం\s*(ఎంత|ఏమిటి)|టైమ్\s*ఎంత|समय\s*(क्या\s*है|बताओ)|टाइम\s*क्या/i.test(norm)) {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit', hour12: true });
-    let msg = `The time is ${timeStr}.`;
-    if (lang.startsWith('te')) msg = `ప్రస్తుత సమయం ${timeStr}.`;
-    if (lang.startsWith('hi')) msg = `अभी का समय ${timeStr} है।`;
-    speak(msg);
+  // Hands-Free Device Status: Battery & Charging (Instant 0ms local response)
+  if (/\b(battery|charge|charging|battery percentage|battery level|battery status|phone battery)\b|బ్యాటరీ|ఛార్జింగ్|ఛార్జ్\s*ఎంత|बैटरी|चार्जिंग|चार्ज\s*कितना/i.test(norm)) {
+    speakBatteryStatus();
     return;
   }
 
-  // 2. Current Date & Day
-  if (/\b(what is today's date|today's date|what date is it|what day is today)\b|ఈ\s*రోజు\s*తేదీ|ఈరోజు\s*ఏమిటి|आज\s*की\s*तारीख|आज\s*कौन\s*सा\s*दिन/i.test(norm)) {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString(lang, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    let msg = `Today is ${dateStr}.`;
-    if (lang.startsWith('te')) msg = `ఈ రోజు ${dateStr}.`;
-    if (lang.startsWith('hi')) msg = `आज ${dateStr} है।`;
-    speak(msg);
+  // Hands-Free Device Status: Current Time
+  if (/\b(what time is it|what is the time|current time|tell me the time|what's the time|the time|time please)\b|సమయం\s*(ఎంత|ఏమిటి)|టైమ్\s*ఎంత|समय\s*(क्या\s*है|बताओ)|टाइम\s*(क्या|बताओ)|कितने\s*बजे/i.test(norm)) {
+    speakTimeStatus();
+    return;
+  }
+
+  // Hands-Free Device Status: Current Date & Day
+  if (/\b(what is today's date|today's date|what date is it|what day is today|today's day|current date)\b|ఈ\s*రోజు\s*తేదీ|ఈరోజు\s*(ఏమిటి|ఏ\s*వారం)|आज\s*की\s*तारीख|आज\s*क्या\s*तारीख|आज\s*कौन\s*सा\s*दिन/i.test(norm)) {
+    speakDateStatus();
+    return;
+  }
+
+  // Spoken Voice Reminders
+  if (REMINDV.test(norm) || /\b(my reminders|list reminders|show reminders)\b/i.test(norm)) {
+    handleVoiceReminder(cleanText);
     return;
   }
 
@@ -2881,9 +3252,27 @@ async function handle(text, vec) {
     return;
   }
 
-  // Camera-to-Voice: Describe camera, currency reader, medicine/text reader
-  if (/\b(describe\s*camera|what('s| is)\s*in\s*front(\s*of\s*me)?|what\s*do\s*you\s*see|read\s*(this|label|medicine|text|document)|identify\s*(note|currency|money)|(what|which)\s*note\s*is\s*this|currency\s*note|scan\s*note|camera)\b|నా\s*ముందు\s*ఏముంది|నోటు\s*ఎంత|ఇది\s*ఏమిటి|కరెన్సీ\s*(చదువు|ఎంత)|కెమెరా\s*వివరించు|सामने\s*क्या\s*है|यह\s*क्या\s*है|नोट\s*(कितना|पहचानो|पढ़ो)|कैमरा\s*वर्णन/i.test(norm)) {
-    describeCamera();
+  // 1. Medicine & Expiry Date Scanner
+  if (/\b(check\s*medicine|read\s*medicine|medicine\s*expiry|expiry\s*date|check\s*expiry|read\s*tablet|read\s*label|scan\s*medicine)\b|మందులు\s*(చూడు|చదువు)|మందుల\s*ప్యాకెట్|ఎక్స్‌పైరీ\s*(డేట్|తేదీ)|దవా\s*(చూడు|చదువు)|दवा\s*(जांचो|पढ़ो|चेक)|एक्सपायरी\s*डेट|दवा\s*की\s*तारीख/i.test(norm)) {
+    describeCamera('medicine');
+    return;
+  }
+
+  // 2. Indian Currency & Bill Reader
+  if (/\b(which\s*note|what\s*note|count\s*money|read\s*bill|check\s*bill|currency\s*note|count\s*cash|read\s*receipt|how\s*much\s*money|identify\s*(note|currency|money))\b|నోటు\s*(ఎంత|ఏమిటి)|కరెన్సీ\s*(నోటు|చదువు|ఎంత)|డబ్బులు\s*లెక్కించు|బిల్లు\s*చదువు|ఎంత\s*డబ్బు|రసీదు\s*చదువు|कौन\s*सा\s*नोट\s*है|पैसे\s*गिनो|नोट\s*(पहचानो|पढ़ो|कितना)|बिल\s*पढ़ो|रसीद\s*पढ़ो|कितने\s*पैसे/i.test(norm)) {
+    describeCamera('currency');
+    return;
+  }
+
+  // 3. Color & Light Detector
+  if (/\b(what\s*colou?r\s*is\s*this|what\s*colou?r|detect\s*colou?r|is\s*the\s*light\s*on|is\s*light\s*on|is\s*room\s*dark|colou?r\s*detector|check\s*light|detect\s*light)\b|రంగు\s*(ఏమిటి|ఏంటి)|ఇది\s*ఏ\s*రంగు|లైట్\s*(ఉందా|ఆన్)|వెలుతురు\s*ఉందా|గది\s*చీకటిగా\s*ఉందా|यह\s*कौन\s*सा\s*रंग\s*है|रंग\s*बताओ|क्या\s*लाइट\s*चालू\s*है|कमरे\s*में\s*रोशनी\s*है|अंधेरा\s*है/i.test(norm)) {
+    describeCamera('color');
+    return;
+  }
+
+  // 4. General Camera Describe
+  if (/\b(describe\s*camera|what('s| is)\s*in\s*front(\s*of\s*me)?|what\s*do\s*you\s*see|read\s*(this|text|document)|scan\s*around|camera\s*view|camera)\b|నా\s*ముందు\s*ఏముంది|ఇది\s*ఏమిటి|కెమెరా\s*వివరించు|కెమెరా\s*చూడు|सामने\s*क्या\s*है|यह\s*क्या\s*है|कैमरा\s*वर्णन/i.test(norm)) {
+    describeCamera('general');
     return;
   }
 
@@ -3295,9 +3684,61 @@ const btnDescribeCamera = $('btnDescribeCamera');
 if (btnDescribeCamera) {
   btnDescribeCamera.addEventListener('click', (e) => {
     e.stopPropagation();
-    describeCamera();
+    closeToolsDrawer();
+    describeCamera('general');
   });
 }
+
+const btnScanMedicine = $('btnScanMedicine');
+if (btnScanMedicine) {
+  btnScanMedicine.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeToolsDrawer();
+    describeCamera('medicine');
+  });
+}
+
+const btnScanCurrency = $('btnScanCurrency');
+if (btnScanCurrency) {
+  btnScanCurrency.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeToolsDrawer();
+    describeCamera('currency');
+  });
+}
+
+const btnDetectColor = $('btnDetectColor');
+if (btnDetectColor) {
+  btnDetectColor.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeToolsDrawer();
+    describeCamera('color');
+  });
+}
+
+const btnDeviceStatus = $('btnDeviceStatus');
+if (btnDeviceStatus) {
+  btnDeviceStatus.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeToolsDrawer();
+    speakBatteryStatus();
+  });
+}
+
+const btnListReminders = $('btnListReminders');
+if (btnListReminders) {
+  btnListReminders.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeToolsDrawer();
+    showRemindersListModal();
+  });
+}
+
+// Restore any active pending reminders from storage on load
+try {
+  activeReminders = loadReminders().filter(r => r.dueTime > Date.now());
+  activeReminders.forEach(scheduleReminderTimer);
+} catch(e) {}
 
 const btnEmergencySos = $('btnEmergencySos');
 if (btnEmergencySos) {
