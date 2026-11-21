@@ -15,9 +15,9 @@ from flask import Flask, jsonify, request, send_from_directory, Response
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
-DEFAULT_GEMINI_KEY = "AQ.Ab8RN6IkNEV4z43r9RKBPUIQ0IBJA_fyAuxxe1Rg3_nv2QhiIA"
+DEFAULT_GEMINI_KEY = ""  # Set via GEMINI_API_KEY environment variable
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or DEFAULT_GEMINI_KEY
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent"
@@ -261,22 +261,33 @@ def gen_config(**extra):
     return cfg
 
 
-def call_gemini(body, timeout=30):
-    resp = HTTP_SESSION.post(
-        GEMINI_URL,
-        headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
-        json=body,
-        timeout=timeout,
-    )
-    resp.raise_for_status()
-    candidates = resp.json().get("candidates", [])
-    if not candidates:
-        raise ValueError("No candidates returned from Gemini")
-    parts = candidates[0].get("content", {}).get("parts", [])
-    text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text"))
-    if not text:
-        raise ValueError("Empty response text from Gemini")
-    return text
+def call_gemini(body, timeout=20):
+    models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+    # remove duplicates while preserving order
+    models_to_try = list(dict.fromkeys(models_to_try))
+    last_err = None
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            resp = HTTP_SESSION.post(
+                url,
+                headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
+                json=body,
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text"))
+                    if text:
+                        return text
+            last_err = f"{resp.status_code}: {resp.text[:100]}"
+        except Exception as e:
+            last_err = str(e)
+            continue
+    raise RuntimeError(f"All Gemini models failed. Last error: {last_err}")
 
 
 async def generate_neural_speech(text: str, voice: str) -> bytes:
@@ -302,7 +313,7 @@ def page_not_found(e):
 
 @app.get("/health")
 def health():
-    return jsonify(ok=True, has_key=bool(GEMINI_API_KEY), model=GEMINI_MODEL, storage="sqlite")
+    return jsonify(ok=True, has_key=bool(GEMINI_API_KEY), model=GEMINI_MODEL, storage="sqlite", key_prefix=GEMINI_API_KEY[:15] if GEMINI_API_KEY else "")
 
 
 
@@ -975,6 +986,21 @@ def voice_form():
 
 
 if __name__ == "__main__":
+    import socket
+    try:
+        from werkzeug.serving import BaseWSGIServer
+        orig_server_bind = BaseWSGIServer.server_bind
+        def dual_stack_server_bind(self):
+            if self.address_family == socket.AF_INET6:
+                try:
+                    self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                except Exception:
+                    pass
+            return orig_server_bind(self)
+        BaseWSGIServer.server_bind = dual_stack_server_bind
+    except Exception:
+        pass
+
     port = int(os.environ.get("PORT", 5050))
     host = os.environ.get("HOST", "::")
     try:
