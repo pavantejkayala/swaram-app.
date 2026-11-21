@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import sqlite3
+import subprocess
 import urllib.parse
 
 import edge_tts
@@ -14,7 +15,8 @@ from flask import Flask, jsonify, request, send_from_directory, Response
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+DEFAULT_GEMINI_KEY = "AQ.Ab8RN6IkNEV4z43r9RKBPUIQ0IBJA_fyAuxxe1Rg3_nv2QhiIA"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or DEFAULT_GEMINI_KEY
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -44,6 +46,12 @@ INTENTS = {
 
 UI_CACHE = {}
 TTS_CACHE = {}
+HTTP_SESSION = requests.Session()
+HTTP_SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://translate.google.com/"
+})
+
 
 ACTIVE_QUIZZES = {}    # session_id -> {topic, questions, index, score}
 ACTIVE_FORMS = {}      # session_id -> {fields, answers, index, lang, i18n}
@@ -231,16 +239,11 @@ NEURAL_VOICES = {
 def build_system_prompt(lang_code: str) -> str:
     lang = LANG_NAMES.get(lang_code, "English")
     return (
-        f"You are Swaram, a friendly, intelligent voice AI companion like Alexa and Siri. "
-        f"Reply in {lang}. Your reply is read aloud by text-to-speech, so: "
-        "no markdown, no asterisks, no bullet points, no numbered lists, no headings, "
-        "no emojis, no URLs. Use plain, natural, expressive conversational spoken sentences. "
-        "Listen carefully to what the owner says and expresses, acknowledge their thoughts warmly, "
-        "and give clear, direct, and helpful answers. "
-        "Keep your responses natural and concise, around 1 to 3 spoken sentences (under 60 words), "
-        "just like speaking in person. "
-        "Write in the native script of the language: Telugu script for Telugu, Devanagari for "
-        "Hindi and Marathi, Tamil script for Tamil, and English for English."
+        f"You are Swaram, a lightning-fast, intelligent voice AI companion like Siri. "
+        f"Reply in {lang}. Spoken text only: strictly no markdown, no asterisks, no bullets, no emojis. "
+        "Be direct, warm, and concise: answer in 1 or 2 natural spoken sentences (under 30 words). "
+        "Never use lists, preambles, or filler. Give the direct answer immediately. "
+        "Native script: Telugu script for Telugu, Devanagari for Hindi/Marathi, Tamil script for Tamil, English for English."
     )
 
 
@@ -253,13 +256,13 @@ def clean_for_speech(text: str) -> str:
 
 
 def gen_config(**extra):
-    cfg = {"temperature": 0.7, "maxOutputTokens": 300}
+    cfg = {"temperature": 0.6, "maxOutputTokens": 90}
     cfg.update(extra)
     return cfg
 
 
 def call_gemini(body, timeout=30):
-    resp = requests.post(
+    resp = HTTP_SESSION.post(
         GEMINI_URL,
         headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
         json=body,
@@ -302,17 +305,103 @@ def health():
     return jsonify(ok=True, has_key=bool(GEMINI_API_KEY), model=GEMINI_MODEL, storage="sqlite")
 
 
+
+# =====================================================================
+# WINDOWS NATIVE APPLICATION LAUNCHER
+# =====================================================================
+NATIVE_APPS = {
+    # Calculator
+    "calculator": "calc.exe", "calc": "calc.exe", "క్యాలిక్యులేటర్": "calc.exe", "कैलकुलेटर": "calc.exe",
+    # Notepad
+    "notepad": "notepad.exe", "notes": "notepad.exe", "నోట్‌ప్యాడ్": "notepad.exe", "नोटपैड": "notepad.exe",
+    # Camera
+    "camera": "start microsoft.windows.camera:", "క్యామెరా": "start microsoft.windows.camera:", "कैमरा": "start microsoft.windows.camera:",
+    # Settings
+    "settings": "start ms-settings:", "సెట్టింగ్స్": "start ms-settings:", "सेटिंग्स": "start ms-settings:",
+    # Paint
+    "paint": "mspaint.exe", "పెయింట్": "mspaint.exe", "पेंट": "mspaint.exe",
+    # File Explorer
+    "explorer": "explorer.exe", "file explorer": "explorer.exe", "files": "explorer.exe", "ఫైల్స్": "explorer.exe", "फ़ाइलें": "explorer.exe",
+    # Spotify
+    "spotify": "start spotify:", "స్పాటిఫై": "start spotify:", "स्पॉटिफाई": "start spotify:",
+    # WhatsApp
+    "whatsapp": "start whatsapp:", "వాట్సాప్": "start whatsapp:", "व्हाट्सएप": "start whatsapp:",
+    # Clock / Timer
+    "clock": "start ms-clock:", "timer": "start ms-clock:", "alarm": "start ms-clock:", "గడియారం": "start ms-clock:", "घड़ी": "start ms-clock:",
+    # Calendar
+    "calendar": "start outlookcal:", "క్యాలెండర్": "start outlookcal:", "कैलेंडर": "start outlookcal:",
+    # Chrome / Browser
+    "chrome": "start chrome", "browser": "start chrome", "గూగుల్ క్రోమ్": "start chrome",
+    # Edge
+    "edge": "start msedge",
+    # Command Prompt
+    "cmd": "start cmd.exe", "command prompt": "start cmd.exe", "terminal": "start wt.exe", "కమాండ్ ప్రాంప్ట్": "start cmd.exe",
+    # Task Manager
+    "task manager": "taskmgr.exe",
+    # Store
+    "store": "start ms-windows-store:", "microsoft store": "start ms-windows-store:",
+    # Weather
+    "weather": "start bingweather:", "వాతావరణం": "start bingweather:", "मौसम": "start bingweather:",
+    # Photos
+    "photos": "start ms-photos:", "ఫోటోలు": "start ms-photos:", "फ़ोटो": "start ms-photos:",
+}
+
+@app.post("/api/open-app")
+def open_native_app():
+    data = request.get_json(force=True, silent=True) or {}
+    app_query = (data.get("app") or "").strip().lower()
+    if not app_query:
+        return jsonify(ok=False, error="No app name specified"), 400
+
+    cmd = None
+    matched_name = app_query
+    for key, command in NATIVE_APPS.items():
+        if key == app_query or key in app_query or app_query in key:
+            cmd = command
+            matched_name = key.capitalize()
+            break
+
+    if not cmd:
+        clean_name = re.sub(r'[^a-zA-Z0-9_\-]', '', app_query)
+        if clean_name:
+            cmd = f"start {clean_name}"
+            matched_name = clean_name.capitalize()
+
+    if cmd:
+        try:
+            subprocess.Popen(cmd, shell=True)
+            return jsonify(ok=True, app=matched_name, launched=True)
+        except Exception as e:
+            return jsonify(ok=False, error=str(e)), 500
+
+    return jsonify(ok=False, error="App not recognized"), 404
+
 @app.get("/api/tts")
 def tts():
     text = (request.args.get("text") or "").strip()
     lang = request.args.get("lang", "en-IN")
+    engine = request.args.get("engine", "fast")  # 'fast' (~0.3s) or 'neural' (~1.2s)
     if not text:
         return "empty text", 400
 
-    cache_key = f"{lang}:{text}"
+    cache_key = f"{engine}:{lang}:{text}"
     if cache_key in TTS_CACHE:
         return Response(TTS_CACHE[cache_key], mimetype="audio/mpeg")
 
+    # Fast Engine (Google Translate TTS ~0.3s)
+    if engine == "fast":
+        tl = lang.split("-")[0].lower()
+        try:
+            url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={tl}&client=tw-ob&q={urllib.parse.quote(text[:250])}"
+            r = HTTP_SESSION.get(url, timeout=6)
+            if r.status_code == 200 and r.content:
+                if len(TTS_CACHE) < 500:
+                    TTS_CACHE[cache_key] = r.content
+                return Response(r.content, mimetype="audio/mpeg")
+        except Exception as e:
+            app.logger.warning("Fast TTS failed, trying neural: %s", e)
+
+    # Neural Engine (Azure Edge-TTS ~1.2s)
     voice = NEURAL_VOICES.get(lang) or NEURAL_VOICES.get("en-IN")
     try:
         loop = asyncio.new_event_loop()
@@ -320,40 +409,21 @@ def tts():
         audio_bytes = loop.run_until_complete(generate_neural_speech(text, voice))
         loop.close()
         if audio_bytes:
-            if len(TTS_CACHE) < 300:
+            if len(TTS_CACHE) < 500:
                 TTS_CACHE[cache_key] = audio_bytes
             return Response(audio_bytes, mimetype="audio/mpeg")
     except Exception as exc:
         app.logger.warning("Neural TTS failed, falling back to Google TTS: %s", exc)
 
+    # Fallback to Google TTS
     tl = lang.split("-")[0].lower()
-    parts = [p.strip() for p in re.split(r'([.?!।,\n]+)', text) if p.strip()]
-    chunks = []
-    curr = ""
-    for p in parts:
-        if len(curr) + len(p) < 170:
-            curr += " " + p
-        else:
-            if curr.strip():
-                chunks.append(curr.strip())
-            curr = p
-    if curr.strip():
-        chunks.append(curr.strip())
-    if not chunks:
-        chunks = [text[:170]]
-
-    audio_bytes = b""
-    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        for chunk in chunks:
-            url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={tl}&client=tw-ob&q={urllib.parse.quote(chunk)}"
-            r = requests.get(url, headers=headers, timeout=10)
-            if r.status_code == 200 and r.content:
-                audio_bytes += r.content
-        if audio_bytes:
-            if len(TTS_CACHE) < 300:
-                TTS_CACHE[cache_key] = audio_bytes
-            return Response(audio_bytes, mimetype="audio/mpeg")
+        url = f"https://translate.google.com/translate_tts?ie=UTF-8&tl={tl}&client=tw-ob&q={urllib.parse.quote(text[:250])}"
+        r = HTTP_SESSION.get(url, timeout=6)
+        if r.status_code == 200 and r.content:
+            if len(TTS_CACHE) < 500:
+                TTS_CACHE[cache_key] = r.content
+            return Response(r.content, mimetype="audio/mpeg")
     except Exception as e:
         app.logger.error("TTS fetch error: %s", e)
 
@@ -906,4 +976,8 @@ def voice_form():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    host = os.environ.get("HOST", "::")
+    try:
+        app.run(host=host, port=port, debug=True)
+    except Exception:
+        app.run(host="0.0.0.0", port=port, debug=True)
