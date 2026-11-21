@@ -1,3 +1,18 @@
+"""
+==============================================================================
+PROJECT: Swaram (స్వరం) - Voice-First AI Skill Coach & Accessibility Assistant
+LEAD ARCHITECT & DEVELOPER: Kayala Durga Pavan Teja & Engineering Team
+REPOSITORY: https://github.com/pavantejkayala/swaram-app.
+LICENSE: MIT Open Source
+TARGET USERS: 40+ Million Visually Impaired & Hands-Free Learners across India
+
+ARCHITECTURAL PRINCIPLES:
+  1. Accessibility-First: 100% eyes-free operation with auditory earcons and WCAG AAA compliance.
+  2. Edge-Cloud Hybrid: Biometric voiceprints stay local (Web Audio API MFCC); generative reasoning handled via low-latency Gemini 3.1 Flash Lite.
+  3. Resilient Multilingual Fallback: Seamless 3-tier speech synthesis (Edge-TTS -> Google TTS -> Web Speech).
+==============================================================================
+"""
+
 import asyncio
 import hashlib
 import json
