@@ -85,6 +85,7 @@ class TestSwaramEndpoints(unittest.TestCase):
     def test_06_vision_api(self):
         """Verify camera-to-voice multimodal vision endpoint for visually impaired users."""
         sample_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        # Test general vision
         payload = json.dumps({"image": sample_b64, "lang": "en-IN"}).encode()
         req = urllib.request.Request(
             f"{BASE_URL}/api/vision",
@@ -99,6 +100,19 @@ class TestSwaramEndpoints(unittest.TestCase):
             self.assertTrue(len(desc) > 3)
             self.assertNotIn("*", desc)
             print(f"  [PASS] Vision API verified: '{desc[:50]}...'")
+
+        # Test medicine mode
+        med_payload = json.dumps({"image": sample_b64, "lang": "en-IN", "mode": "medicine"}).encode()
+        req_med = urllib.request.Request(
+            f"{BASE_URL}/api/vision",
+            data=med_payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req_med, timeout=15) as resp:
+            self.assertEqual(resp.status, 200)
+            med_data = json.loads(resp.read().decode())
+            self.assertTrue(med_data.get("ok"))
+            self.assertEqual(med_data.get("mode"), "medicine")
 
     def test_07_directions(self):
         """Verify interactive GPS directions and compass bearing navigation."""
