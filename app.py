@@ -1,26 +1,6 @@
 """
-==============================================================================
-PROJECT: Swaram (స్వరం) - Voice-First Accessibility Operating Layer & Skill Coach
-LEAD ARCHITECT & SYSTEMS ENGINEER: Kayala Durga Pavan Teja & Engineering Team
-REPOSITORY: https://github.com/pavantejkayala/swaram-app.
-LICENSE: MIT Open Source
-TARGET AUDIENCE: 40+ Million Visually Impaired & Hands-Free Citizens in India
-
-HACKATHON ARCHITECTURE RATIO:
-  • 80% Core Human Software Engineering:
-    1. Geodesic Spatial Navigation: Great-Circle forward azimuth trigonometry (atan2),
-       Haversine distance calculations, and 8-point compass projection across 11 languages.
-    2. Client-Side Edge DSP & Biometrics: 100% on-device Web Audio API FFT bin analysis
-       and Mel-frequency filterbanks for biometric voice locking without external servers.
-    3. Deterministic Finite-State Machines: Rule-based intent grammars, phone calling,
-       contact picker integration, emergency SOS, app launching, math, and PDF seek.
-    4. Multi-Tier Audio Streaming: Asynchronous Edge-TTS + Google TTS fallbacks with
-       sentence-by-sentence Server-Sent Events (SSE) and zero-gap pipelined queues.
-    5. Relational Persistence: SQLite WAL mode with PBKDF2 cryptography and session isolation.
-  • 20% Generative Conversational AI:
-    - Bounded Gemini 3.1 Flash Lite strictly constrained to 1-2 spoken sentences
-      used solely for open-domain conversational explanations when deterministic rules do not apply.
-==============================================================================
+Swaram - Voice accessibility and skill coach for Indian regional languages.
+Developed by Kayala Durga Pavan Teja and team.
 """
 
 import asyncio
@@ -83,9 +63,7 @@ HTTP_SESSION.headers.update({
 ACTIVE_QUIZZES = {}    # session_id -> {topic, questions, index, score}
 ACTIVE_FORMS = {}      # session_id -> {fields, answers, index, lang, i18n}
 
-# =====================================================================
-# PERSISTENT SQLITE DATABASE LAYER
-# =====================================================================
+# --- Database storage (SQLite) ---
 DB_PATH = os.path.join(os.path.dirname(__file__), "swaram.db")
 
 def get_db():
@@ -196,9 +174,7 @@ def db_save_form(session_id: str, form_data: dict):
     with get_db() as conn:
         conn.execute("INSERT INTO form_responses (session_id, form_data) VALUES (?, ?)", (session_id, json.dumps(form_data, ensure_ascii=False)))
 
-# =====================================================================
-# CURRICULUM & MULTILINGUAL FORM TEMPLATES
-# =====================================================================
+# --- Course curriculum and voice forms ---
 COURSES = {
     "dsa": {
         "title": "Data Structures and Algorithms",
@@ -375,9 +351,7 @@ def health():
 
 
 
-# =====================================================================
-# WINDOWS NATIVE APPLICATION LAUNCHER
-# =====================================================================
+# --- Native app shortcuts ---
 NATIVE_APPS = {
     # Calculator
     "calculator": "calc.exe", "calc": "calc.exe", "క్యాలిక్యులేటర్": "calc.exe", "कैलकुलेटर": "calc.exe",
@@ -1023,9 +997,7 @@ def intent():
         return jsonify(intent="none")
 
 
-# =====================================================================
-# AUTH & INTERACTIVE LEARNING ENDPOINTS (SQLITE BACKED)
-# =====================================================================
+# --- Auth and learning endpoints ---
 
 @app.post("/api/auth/register")
 def register():
