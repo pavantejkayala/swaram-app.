@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>404 - Page Not Found | Swaram</title>
+<style>
+  :root { --bg:#000; --fg:#fff; --accent:#ffd400; --err:#ff5252; }
+  * { box-sizing: border-box; }
+  body { height: 100vh; margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 24px; }
+  .err-orb { width: 140px; height: 140px; border-radius: 50%; border: 6px solid var(--err);
+    box-shadow: 0 0 40px var(--err); display: flex; align-items: center; justify-content: center;
+    font-size: 3rem; font-weight: 800; color: var(--err); margin-bottom: 24px; }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); margin: 0 0 12px; }
+  p { font-size: 1.2rem; color: #ccc; max-width: 600px; line-height: 1.5; margin-bottom: 24px; }
+  a { padding: 16px 32px; font-size: 1.2rem; font-weight: bold; background: var(--accent);
+    color: #000; border-radius: 14px; text-decoration: none; }
+  #speakMsg { margin-top: 18px; font-size: 0.95rem; color: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="err-orb">404</div>
+  <h1 role="alert">Page Not Found</h1>
+  <p>The page or command you requested cannot be reached. Swaram is redirecting you back to the main voice coach.</p>
+  <a href="/">Return to Swaram Home</a>
+  <div id="speakMsg">Redirecting in 5 seconds...</div>
+
+  <script>
+    const msg = "Sorry, page not found. Redirecting you back to Swaram home.";
+    try {
+      const u = new SpeechSynthesisUtterance(msg);
+      u.rate = 1.0;
+      window.speechSynthesis.speak(u);
+    } catch(e) {}
+    let seconds = 5;
+    setInterval(() => {
+      seconds--;
+      if (seconds <= 0) location.href = '/';
+      else document.getElementById('speakMsg').textContent = `Redirecting in ${seconds} seconds...`;
+    }, 1000);
+  </script>
+</body>
+</html>

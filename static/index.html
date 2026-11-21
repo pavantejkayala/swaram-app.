@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Swaram - Voice Skill Coach</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.png">
+<style>
+  :root { --bg:#000; --fg:#fff; --accent:#ffd400; --listen:#00e676; --think:#40c4ff; --speak:#ff6e40; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Telugu", "Noto Sans Devanagari", sans-serif; }
+  body { display: flex; flex-direction: column; user-select: none; cursor: pointer; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; justify-content: center; }
+  .lang, .lockbtn { flex: 1; max-width: 200px; padding: 18px 8px; font-size: 1.4rem; font-weight: 700;
+    color: var(--fg); background: #111; border: 3px solid #555; border-radius: 16px; cursor: pointer; }
+  .lang[aria-pressed="true"], .lockbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: #1a1600; }
+  .lockbtn { font-size: 1rem; max-width: 100%; flex: 0 1 auto; padding: 14px 18px; }
+  .lang { padding: 12px 6px; font-size: 1.15rem; min-width: 96px; }
+  #dbg { font-size: .9rem; color: #777; text-align: center; min-height: 1.2em; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 16px; gap: 20px; }
+  .orb { width: min(55vw, 280px); height: min(55vw, 280px); border-radius: 50%;
+    border: 10px solid #444; transition: border-color .2s, box-shadow .2s; }
+  body[data-state="listening"] .orb { border-color: var(--listen); box-shadow: 0 0 60px var(--listen); animation: pulse 1s infinite; }
+  body[data-state="thinking"]  .orb { border-color: var(--think);  box-shadow: 0 0 60px var(--think);  animation: spin 1.2s linear infinite; border-top-color: transparent; }
+  body[data-state="speaking"]  .orb { border-color: var(--speak);  box-shadow: 0 0 60px var(--speak);  animation: pulse .6s infinite; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #state { font-size: clamp(2rem, 8vw, 3.5rem); font-weight: 800; }
+  #text { font-size: clamp(1.2rem, 4.5vw, 2rem); line-height: 1.4; max-width: 900px; min-height: 3em; color: #ddd; }
+  #hint { font-size: 1.1rem; color: var(--accent); padding: 0 16px 24px; text-align: center; }
+
+  /* Unified Top Bar & Tools Drawer */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 12px 16px; background: #111; border-bottom: 1px solid #2a2a2a;
+    width: 100%; max-width: 960px; margin: 0 auto;
+  }
+  .pill-select, .icon-btn {
+    background: #1e1e1e; color: #fff; border: 1.5px solid #444;
+    border-radius: 12px; padding: 10px 14px; font-size: 0.95rem; font-weight: 600;
+    cursor: pointer;
+  }
+  .pill-select:focus, .icon-btn:focus { border-color: #ffd400; outline: none; }
+  .pill-select.active { border-color: #ffd400; color: #ffd400; }
+
+  /* Collapsible Tools Drawer */
+  .tools-drawer {
+    display: none; flex-wrap: wrap; gap: 8px; padding: 12px 16px;
+    background: #161616; border-bottom: 1px solid #2a2a2a;
+    width: 100%; max-width: 960px; margin: 0 auto; justify-content: center;
+  }
+  .tools-drawer.open { display: flex; }
+  .tool-chip {
+    background: #222; color: #eee; border: 1px solid #444;
+    border-radius: 999px; padding: 8px 14px; font-size: 0.85rem; cursor: pointer;
+    font-weight: 600;
+  }
+  .tool-chip:hover, .tool-chip:focus { border-color: var(--accent); color: var(--accent); outline: none; }
+
+</style>
+</head>
+<body data-state="idle">
+  <!-- 1. Unified Top Bar (replaces 24 buttons) -->
+  <header class="top-bar">
+    <!-- Single Language Selector (replaces 11 language buttons) -->
+    <select id="langSelect" class="pill-select active" aria-label="Select Language">
+      <option value="te-IN">తెలుగు (Telugu)</option>
+      <option value="hi-IN">हिन्दी (Hindi)</option>
+      <option value="en-IN">English</option>
+      <option value="ta-IN">தமிழ் (Tamil)</option>
+      <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+      <option value="ml-IN">മലയാളം (Malayalam)</option>
+      <option value="mr-IN">मराठी (Marathi)</option>
+      <option value="bn-IN">বাংলা (Bengali)</option>
+      <option value="gu-IN">ગુજરાતી (Gujarati)</option>
+      <option value="pa-IN">ਪੰਜਾਬੀ (Punjabi)</option>
+      <option value="ur-IN">اردو (Urdu)</option>
+    </select>
+
+    <!-- Single Mode Selector (replaces 6 colored mode buttons) -->
+    <select id="modeSelect" class="pill-select" aria-label="Select Learning Mode">
+      <option value="chat">🎙️ Voice Chat</option>
+      <option value="quiz">🎯 Voice Quiz</option>
+      <option value="lesson">💡 Tech Lesson</option>
+      <option value="story">📖 Audio Story</option>
+      <option value="pronounce">🗣️ Pronounce</option>
+      <option value="game">🧩 Riddle Game</option>
+      <option value="form">📝 Voice Form</option>
+    </select>
+
+    <!-- Single Tools Toggle (hides 7 utility buttons until needed) -->
+    <button id="toolsToggle" class="icon-btn" aria-label="Open Tools and Settings">⚙️ Tools</button>
+  </header>
+
+  <!-- 2. Hidden-by-Default Tools Drawer -->
+  <div id="toolsDrawer" class="tools-drawer">
+    <button class="tool-chip" id="btnWakeWord">🎙️ "Hey Swaram": ON</button>
+    <button class="tool-chip" id="btnUploadNotes">📄 Upload Notes</button>
+    <button class="tool-chip" id="btnProgress">📊 Progress: 0 Qs</button>
+    <button class="tool-chip" id="btnReadScreen">🔊 Read Screen</button>
+    <button class="tool-chip" id="btnVoiceLock">🔒 Voice Lock: OFF</button>
+    <button class="tool-chip" id="btnAddContact">👤 Add Contact</button>
+    <button class="tool-chip" id="btnPolicy">🛡️ Policy & Mic</button>
+  </div>
+  <input type="file" id="pdfInput" accept="application/pdf" style="display:none" aria-label="Upload study notes PDF">
+  
+  <!-- Permissions & User Policy Modal -->
+  <div id="policyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#141414; border:2px solid #ffd400; border-radius:18px; max-width:600px; width:100%; padding:24px; max-height:85vh; overflow-y:auto; color:#fff; text-align:left;">
+      <h2 style="color:#ffd400; margin-top:0; display:flex; justify-content:space-between; align-items:center; font-size:1.4rem;">
+        <span>🛡️ Permissions & User Policy</span>
+        <button id="closePolicyBtn" style="background:none; border:none; color:#fff; font-size:1.8rem; cursor:pointer;" aria-label="Close dialog">&times;</button>
+      </h2>
+      <div style="margin-bottom:16px; padding:12px; background:#1e1e1e; border:1px solid #333; border-radius:10px;">
+        <h4 style="margin:0 0 6px; color:#00e676; font-size:1rem;">🎙️ Microphone Permission</h4>
+        <div id="micStatusText" style="font-size:0.95rem; margin-bottom:10px; color:#bbb;">Checking microphone access...</div>
+        <button id="reqMicBtn" style="padding:10px 18px; font-weight:bold; background:#00e676; color:#000; border:none; border-radius:8px; cursor:pointer; font-size:0.95rem;">Check & Allow Microphone</button>
+      </div>
+      <h3 style="color:#ffd400; margin:14px 0 6px; font-size:1.1rem;">Privacy Promise & Siri-Style Background Operation</h3>
+      <p style="line-height:1.55; color:#ccc; font-size:0.9rem;">
+        • <strong>Accessibility First:</strong> Swaram operates 100% eyes-free for visually impaired and hands-free learners.<br>
+        • <strong>Background Operation:</strong> Just like Apple Siri or Google Assistant, Swaram stays active in the background to respond when you call "Hey Swaram".<br>
+        • <strong>Voice Privacy:</strong> Your voice is processed in real time solely to answer your questions and is never recorded or sold.<br>
+        • <strong>Local Contacts & Notes:</strong> Your saved contacts and uploaded notes stay securely in your own private session.<br>
+        • <strong>Offline Resilience:</strong> If internet disconnects, Swaram automatically switches to local voice and offline safety commands.
+      </p>
+      <div style="display:flex; gap:12px; margin-top:18px;">
+        <button id="readPolicyBtn" style="flex:1; padding:12px; font-weight:bold; background:#222; color:#ffd400; border:1px solid #ffd400; border-radius:10px; cursor:pointer;">🔊 Read Policy Aloud</button>
+        <button id="okPolicyBtn" style="flex:1; padding:12px; font-weight:bold; background:#ffd400; color:#000; border:none; border-radius:10px; cursor:pointer;">Agree & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <main role="main" aria-label="Swaram Voice Interface">
+    <div id="netStatus" style="display:none; padding:4px 12px; background:#e65100; color:#fff; border-radius:12px; font-weight:bold; font-size:0.95rem;" role="alert">📶 Offline Mode Active (Local Voice Ready)</div>
+    <div id="activeDoc" style="display:none; padding:4px 14px; background:#1b5e20; color:#a5d6a7; border-radius:14px; font-weight:bold; font-size:0.95rem;">📄 Notes: <span id="docName"></span></div>
+    <div class="orb" role="img" aria-label="Interactive voice orb"></div>
+    <div id="state" role="status" aria-live="polite">Tap anywhere or say "Hey Swaram"</div>
+    <div id="text" role="region" aria-live="assertive" aria-atomic="true"></div>
+  </main>
+  <div id="dbg"></div>
+  <div id="hint">Say <strong>"Hey Swaram"</strong> anytime (even in the background) to talk! Tap: talk &bull; interrupt &bull; pause.</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+
+const stateEl = $('state'), textEl = $('text');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const T_RAW = {
+  'te-IN': {
+    greet: 'నమస్కారం! నేను స్వరం. మీకు ఎలా సహాయపడగలను? చెప్పండి.',
+    selected: 'తెలుగు ఎంచుకున్నారు. మీరు ఏమి తెలుసుకోవాలనుకుంటున్నారు?',
+    err: 'క్షమించండి, ఏదో తప్పు జరిగింది. మళ్ళీ స్క్రీన్‌ను తాకండి.',
+    idle: 'మాట్లాడటానికి తాకండి', listening: 'వింటున్నాను...', thinking: 'ఆలోచిస్తున్నాను...', speaking: 'సమాధానం చెబుతున్నాను...'
+  },
+  'hi-IN': {
+    greet: 'नमस्ते! मैं स्वरम हूँ। मैं आपकी क्या मदद कर सकता हूँ? बोलिए।',
+    selected: 'हिंदी चुनी गई। आप क्या जानना चाहते हैं?',
+    err: 'माफ़ कीजिए, कुछ गड़बड़ हो गई। कृपया स्क्रीन को फिर से छुएँ।',
+    idle: 'बोलने के लिए छुएँ', listening: 'सुन रहा हूँ...', thinking: 'सोच रहा हूँ...', speaking: 'उत्तर दे रहा हूँ...'
+  },
+  'en-IN': {
+    greet: 'Hello! I am Swaram, your AI assistant. How can I help you today? Please speak.',
+    selected: 'English selected. What would you like to know?',
+    err: 'Sorry, something went wrong. Please tap and try again.',
+    idle: 'Tap anywhere to talk', listening: 'Listening to you...', thinking: 'Thinking...', speaking: 'Answering...'
+  }
+};
+
+// ================= extra spoken messages =================
+const V_RAW = {
+  'en-IN': {
+    opening: 'Opening ', tapToOpen: 'Tap the screen to open ',
+    repeat: 'I could not hear you clearly. Please say it again in a full sentence.',
+    enrollStart: 'Let us set up voice lock. I will ask four times. Each time, say any short sentence in your normal voice. Start now.',
+    enrollNext: 'Good. Say another sentence.',
+    enrollDone: 'Voice lock is on. Swaram will now work only for your voice.',
+    mismatch: 'This voice does not match the owner. Swaram does not work for other people.',
+    lockOff: 'Voice lock removed.',
+    lockHow: 'Voice lock is on. To remove it, say remove voice lock in your own voice.',
+    noMic: 'I need microphone permission to check your voice.',
+    calling: 'Calling ', callTap: '. If the phone dialer does not open, tap the screen.',
+    noContact: 'I could not find that contact. Say add contact, then the name and the phone number.',
+    saved: 'Contact saved: ',
+    addFail: 'Please say: add contact, the name, and the 10 digit phone number.',
+    noContacts: 'You have no saved contacts yet. Say add contact, then the name and the number.',
+    contactsAre: 'Your contacts are: ',
+    guestOn: 'Guest mode is on for 10 minutes. Anyone can talk to Swaram now, but calls, contacts and settings still need the owner voice.',
+    guestOff: 'Guest mode is off. Swaram works only for the owner again.',
+    guestEnded: 'Guest time is over. Swaram works only for the owner again.',
+    guestBlocked: 'This needs the owner voice. A guest can only learn and ask questions.',
+    cantHangup: 'I cannot end phone calls from a web page. Please press the red end button on your phone.',
+    cancelled: 'Okay, cancelled.'
+  },
+  'te-IN': {
+    opening: 'తెరుస్తున్నాను: ', tapToOpen: 'తెరవడానికి స్క్రీన్‌ను తాకండి: ',
+    repeat: 'స్పష్టంగా వినపడలేదు. దయచేసి పూర్తి వాక్యంలో మళ్ళీ చెప్పండి.',
+    enrollStart: 'వాయిస్ లాక్ సెట్ చేద్దాం. నేను నాలుగు సార్లు అడుగుతాను. ప్రతిసారి మీ మామూలు గొంతుతో ఏదైనా చిన్న వాక్యం చెప్పండి. ఇప్పుడు మొదలుపెట్టండి.',
+    enrollNext: 'బాగుంది. మరో వాక్యం చెప్పండి.',
+    enrollDone: 'వాయిస్ లాక్ ఆన్ అయింది. ఇకపై స్వరం మీ గొంతుకే పనిచేస్తుంది.',
+    mismatch: 'ఈ గొంతు యజమానిది కాదు. స్వరం ఇతరులకు పనిచేయదు.',
+    lockOff: 'వాయిస్ లాక్ తీసేశాను.',
+    lockHow: 'వాయిస్ లాక్ ఆన్‌లో ఉంది. తీయాలంటే, మీ గొంతుతో వాయిస్ లాక్ తీసేయి అని చెప్పండి.',
+    noMic: 'మీ గొంతును గుర్తించడానికి మైక్రోఫోన్ అనుమతి కావాలి.',
+    calling: 'కాల్ చేస్తున్నాను: ', callTap: '. డయలర్ తెరవకపోతే స్క్రీన్‌ను తాకండి.',
+    noContact: 'ఆ కాంటాక్ట్ దొరకలేదు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి, పేరు, ఫోన్ నంబర్ చెప్పండి.',
+    saved: 'కాంటాక్ట్ సేవ్ చేశాను: ',
+    addFail: 'దయచేసి కాంటాక్ట్ యాడ్ చేయి, పేరు, పది అంకెల ఫోన్ నంబర్ అని చెప్పండి.',
+    noContacts: 'ఇంకా కాంటాక్ట్స్ లేవు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి పేరు, నంబర్ చెప్పండి.',
+    contactsAre: 'మీ కాంటాక్ట్స్: ',
+    guestOn: 'గెస్ట్ మోడ్ పది నిమిషాలు ఆన్‌లో ఉంది. ఇప్పుడు ఎవరైనా స్వరంతో మాట్లాడవచ్చు, కానీ కాల్స్, కాంటాక్ట్స్, సెట్టింగ్స్‌కు యజమాని గొంతు కావాలి.',
+    guestOff: 'గెస్ట్ మోడ్ ఆఫ్ అయింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.',
+    guestEnded: 'గెస్ట్ సమయం ముగిసింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.',
+    guestBlocked: 'దీనికి యజమాని గొంతు కావాలి. అతిథి నేర్చుకోవచ్చు, ప్రశ్నలు అడగవచ్చు మాత్రమే.',
+    cantHangup: 'వెబ్ పేజీ నుంచి ఫోన్ కాల్ ముగించలేను. దయచేసి మీ ఫోన్‌లోని ఎరుపు బటన్ నొక్కండి.',
+    cancelled: 'సరే, రద్దు చేశాను.'
+  },
+  'hi-IN': {
+    opening: 'खोल रहा हूँ: ', tapToOpen: 'खोलने के लिए स्क्रीन को छुएँ: ',
+    repeat: 'साफ़ सुनाई नहीं दिया। कृपया पूरे वाक्य में फिर से बोलिए।',
+    enrollStart: 'आवाज़ लॉक सेट करते हैं। मैं चार बार कहूँगा। हर बार अपनी सामान्य आवाज़ में कोई छोटा वाक्य बोलिए। अब शुरू कीजिए।',
+    enrollNext: 'अच्छा। एक और वाक्य बोलिए।',
+    enrollDone: 'आवाज़ लॉक चालू हो गया। अब स्वरम सिर्फ़ आपकी आवाज़ पर काम करेगा।',
+    mismatch: 'यह आवाज़ मालिक की नहीं है। स्वरम दूसरों के लिए काम नहीं करता।',
+    lockOff: 'आवाज़ लॉक हटा दिया।',
+    lockHow: 'आवाज़ लॉक चालू है। हटाने के लिए अपनी आवाज़ में आवाज़ लॉक हटाओ बोलिए।',
+    noMic: 'आपकी आवाज़ पहचानने के लिए माइक्रोफ़ोन की अनुमति चाहिए।',
+    calling: 'कॉल कर रहा हूँ: ', callTap: '। अगर डायलर न खुले तो स्क्रीन को छुएँ।',
+    noContact: 'वह संपर्क नहीं मिला। कॉन्टैक्ट जोड़ो बोलकर नाम और फ़ोन नंबर बताइए।',
+    saved: 'संपर्क सेव हो गया: ',
+    addFail: 'कृपया बोलिए: कॉन्टैक्ट जोड़ो, नाम, और दस अंकों का फ़ोन नंबर।',
+    noContacts: 'अभी कोई संपर्क सेव नहीं है। कॉन्टैक्ट जोड़ो बोलकर नाम और नंबर बताइए।',
+    contactsAre: 'आपके संपर्क: ',
+    guestOn: 'मेहमान मोड दस मिनट के लिए चालू है। अब कोई भी स्वरम से बात कर सकता है, लेकिन कॉल, संपर्क और सेटिंग के लिए मालिक की आवाज़ चाहिए।',
+    guestOff: 'मेहमान मोड बंद हो गया। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।',
+    guestEnded: 'मेहमान का समय खत्म हुआ। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।',
+    guestBlocked: 'इसके लिए मालिक की आवाज़ चाहिए। मेहमान सिर्फ़ सीख सकता है और सवाल पूछ सकता है।',
+    cantHangup: 'मैं वेब पेज से फ़ोन कॉल खत्म नहीं कर सकता। कृपया फ़ोन का लाल बटन दबाइए।',
+    cancelled: 'ठीक है, रद्द कर दिया।'
+  }
+};
+
+// ================= more languages (menu text is translated by Gemini the first time) =================
+const T = new Proxy(T_RAW, { get: (o, k) => o[k] || o['en-IN'] });
+const V = new Proxy(V_RAW, { get: (o, k) => o[k] || o['en-IN'] });
+const BASE_LANGS = ['te-IN', 'hi-IN', 'en-IN'];
+const EXTRA_LANGS = [['ta-IN', 'தமிழ்'], ['kn-IN', 'ಕನ್ನಡ'], ['ml-IN', 'മലയാളം'], ['mr-IN', 'मराठी'],
+  ['bn-IN', 'বাংলা'], ['gu-IN', 'ગુજરાતી'], ['pa-IN', 'ਪੰਜਾਬੀ'], ['ur-IN', 'اردو']];
+const SR_LANG = { 'pa-IN': 'pa-guru-IN' };       // Chrome's code for Punjabi (Gurmukhi) speech recognition
+// Extra languages are now neatly unified inside #langSelect
+async function ensureStrings(code) {
+  if (T_RAW[code] && V_RAW[code]) return;
+  try {
+    const c = JSON.parse(localStorage.getItem('swaramUI_' + code));
+    if (c && c.t && c.v) { T_RAW[code] = c.t; V_RAW[code] = c.v; return; }
+  } catch (e) {}
+  try {
+    const r = await fetch('/api/ui-strings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: code, strings: { ...T_RAW['en-IN'], ...V_RAW['en-IN'] } })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.strings) throw new Error(d.error || 'translate failed');
+    const t = {}, v = {};
+    Object.keys(T_RAW['en-IN']).forEach(k => { t[k] = d.strings[k] || T_RAW['en-IN'][k]; });
+    Object.keys(V_RAW['en-IN']).forEach(k => { v[k] = d.strings[k] || V_RAW['en-IN'][k]; });
+    T_RAW[code] = t; V_RAW[code] = v;
+    try { localStorage.setItem('swaram' + 'UI_' + code, JSON.stringify({ t, v })); } catch (e) {}
+  } catch (e) { console.error(e); }                // stay on English menu text
+}
+
+// ================= open apps / websites by voice =================
+// BEGIN-OPEN
+const SITES = [
+  [/you\s*tube|యూట్యూబ్|यूट्यूब|यूट्युब/i, 'YouTube', 'https://www.youtube.com'],
+  [/google\s*maps|\bmaps?\b|మ్యాప్స్|मैप्स|मैप/i, 'Maps', 'https://maps.google.com'],
+  [/whats\s*app|వాట్సాప్|వాట్సప్|व्हाट्सएप|व्हाट्सऐप|वॉट्सऐप|वाट्सऐप/i, 'WhatsApp', 'https://web.whatsapp.com'],
+  [/g\s*mail|జీమెయిల్|जीमेल/i, 'Gmail', 'https://mail.google.com'],
+  [/\bgoogle\b|గూగుల్|गूगल/i, 'Google', 'https://www.google.com'],
+  [/insta(gram)?|ఇన్.?స్టాగ్రామ్|इंस्टाग्राम|इंस्टा/i, 'Instagram', 'https://www.instagram.com'],
+  [/face\s*book|ఫేస్.?బుక్|फेसबुक/i, 'Facebook', 'https://www.facebook.com'],
+  [/wikipedia|వికీపీడియా|विकिपीडिया/i, 'Wikipedia', 'https://www.wikipedia.org'],
+  [/amazon|అమెజాన్|अमेज़न|अमेजन|अमेज़ॉन/i, 'Amazon', 'https://www.amazon.in'],
+  [/flipkart|ఫ్లిప్.?కార్ట్|फ्लिपकार्ट/i, 'Flipkart', 'https://www.flipkart.com'],
+  [/spotify|స్పాటిఫై|स्पॉटिफाई|स्पोटीफाई/i, 'Spotify', 'https://open.spotify.com'],
+  [/translate|అనువాదం|ट्रांसलेट|अनुवाद/i, 'Translate', 'https://translate.google.com'],
+  [/\bnews\b|వార్తలు|समाचार|खबर|ख़बर/i, 'News', 'https://news.google.com']
+];
+const YT_RE = SITES[0][0];
+const OPENV = /\b(open|launch|go to|take me to)\b|ఓపెన్|తెరవ|తెరు|ओपन|खोल/i;
+const PLAYV = /\bplay\b|ప్లే|प्ले|चलाओ|चलाइए/i;
+const SEARCHV = /\b(search for|google|search on google|\bsearch\b|look up)\b|గూగుల్\s*(చేయి|లో\s*వెతుకు)|వెతుకు|खोजो|सर्च\s*करो/i;
+const FILLER = /\b(please|plz|the|app|website|site|on|in|for|from)\b|చేయండి|చేయి|కోసం|పై|లో|करो|कीजिए|करें|में|पर/gi;
+
+function parseOpen(text) {
+  const t = text.trim();
+  const site = SITES.find(s => s[0].test(t));
+  const wantsYT = site && site[1] === 'YouTube';
+  if (PLAYV.test(t) && (wantsYT || /song|music|పాట|गाना|गाने/i.test(t))) {
+    const q = t.replace(new RegExp(PLAYV.source, 'gi'), ' ').replace(new RegExp(YT_RE.source, 'gi'), ' ')
+      .replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+    return { name: 'YouTube', url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q || 'songs') };
+  }
+  if (SEARCHV.test(t)) {
+    const q = t.replace(new RegExp(SEARCHV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+    if (q) return { name: 'Google: ' + q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
+  }
+  if (!OPENV.test(t)) return null;
+  if (site) return { name: site[1], url: site[2] };
+  const q = t.replace(new RegExp(OPENV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  if (!q || q.split(' ').length > 4) return null;      // long sentence = a lesson request, not a command
+  return { name: q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) };
+}
+
+const LOCKW = /voice\s*lock|lock\s*(my\s*)?voice|(register|set\s*up|set)\s*(my\s*)?voice|वॉ[इय]स\s*लॉक|आवा\S{0,3}\s*लॉक|వాయిస్\s*లాక్|గొంతు\s*లాక్/i;
+const OFFW = /turn\s*off|remove|disable|unlock|\boff\b|stop|हटा|बंद|ऑफ|తీసే|తీయ|ఆఫ్|తొలగ/i;
+function parseLockCmd(t) { if (!LOCKW.test(t)) return null; return OFFW.test(t) ? 'off' : 'on'; }
+// END-OPEN
+
+// ================= call contacts by voice =================
+// BEGIN-CALL
+const CALLV = /\b(call|dial|phone|ring)\b|కాల్|ఫోన్ చేయి|डायल|कॉल|फ़ोन कर|फोन कर/i;
+const ADDV = /\b(save|add)\s+(a\s+)?(new\s+)?contact\b|కాంటాక్ట్\s*(యాడ్|సేవ్)|कॉन्टैक्ट\s*(जोड़|जोड|सेव|add)\S*|संपर्क\s*(जोड़|जोड|सेव)\S*/i;
+const LISTV = /\b(list|read|tell)\b.*\bcontacts?\b|\bmy contacts\b|కాంటాక్ట్స్|कॉन्टैक्ट्स|मेरे संपर्क/i;
+const CONTACT_KEY = 'swaramContacts';
+function loadContacts() { try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || []; } catch (e) { return []; } }
+function saveContacts(c) { localStorage.setItem(CONTACT_KEY, JSON.stringify(c)); }
+function phoneFrom(text) {
+  const d = (text.match(/[\d\s\-+]+/g) || []).join('').replace(/\D/g, '');
+  if (d.length === 10) return '+91' + d;
+  if (d.length === 12 && d.startsWith('91')) return '+' + d;
+  if (['100', '101', '102', '108', '112', '1098'].includes(d)) return d;   // emergency numbers
+  return null;
+}
+function parseCall(text) {
+  const t = text.trim(), tl = t.toLowerCase();
+  if (ADDV.test(t)) {
+    const num = phoneFrom(t);
+    const name = t.replace(new RegExp(ADDV.source, 'gi'), ' ').replace(/[\d\s\-+]*\d[\d\s\-+]*/g, ' ')
+      .replace(/\b(name|number|is|as|with|named|the)\b|పేరు|నంబర్|नाम|नंबर/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!num || !name) return { type: 'addfail' };
+    return { type: 'add', name, number: num };
+  }
+  if (LISTV.test(t) && !CALLV.test(t)) return { type: 'list' };
+  if (!CALLV.test(t)) return null;
+  const hit = loadContacts().find(c => tl.includes(c.name.toLowerCase()));
+  if (hit) return { type: 'call', name: hit.name, number: hit.number };
+  const num = phoneFrom(t);
+  if (num) return { type: 'call', name: num, number: num };
+  const rest = t.replace(new RegExp(CALLV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  if (rest && rest.split(' ').length <= 3) return { type: 'nocontact' };
+  return null;                                  // long sentence = a lesson request
+}
+// END-CALL
+
+// ================= guest mode, ending calls, cancel, AI commands for any language =================
+// BEGIN-CMD
+const GUEST_WORD = /guest|అతిథి|గెస్ట్|मेहमान|गेस्ट/i;
+const GUEST_OFF = /\b(stop|end|off|disable|finish|cancel)\b|ఆపు|ముగించు|ఆఫ్|తీసేయ|बंद|खत्म|हटा|ऑफ|समाप्त/i;
+const GUEST_ON = /\b(allow|let|permit|permission)\b.*\b(guest|friend|someone|person|people|others?)\b|\bguest\s*mode\b|\bguest\b.*\b(talk|speak|use)\b|(అతిథి|గెస్ట్).*(అనుమతి|ఆన్|మోడ్)|స్నేహితుడు.*(అనుమతి|మాట్లాడ)|మరొకరిని.*(అనుమతి|మాట్లాడ)|(मेहमान|गेस्ट).*(इजाज़त|इजाजत|अनुमति|चालू|मोड)|दोस्त.*(इजाज़त|इजाजत|अनुमति|बात)|दूसरे.*(इजाज़त|इजाजत|अनुमति|बात)/i;
+const ENDV = /\b(end|cut|hang\s*up|disconnect|drop)\b.*\bcall\b|\bhang\s*up\b|call\s*(cut|end)\b|కాల్\s*(కట్|ఆపు|ముగించు)|कॉल\s*(कट|काट|बंद|खत्म)|फ़ोन\s*(काट|रख)/i;
+const CANCELV = /^\s*(cancel|stop|never\s*mind|don'?t)\b|వద్దు|ఆపు|रुको|रहने दो|मत करो/i;
+function parseGuest(t) {
+  if (GUEST_WORD.test(t) && GUEST_OFF.test(t)) return 'off';
+  if (GUEST_ON.test(t)) return 'on';
+  return null;
+}
+let isGuest = false, guestUntil = 0;
+const guestActive = () => Date.now() < guestUntil;
+function guestBlock() { session = true; speak(V[lang].guestBlocked); }
+function guestOn() { guestUntil = Date.now() + 10 * 60 * 1000; session = false; speak(V[lang].guestOn); }
+function guestOff() { guestUntil = 0; session = false; speak(V[lang].guestOff); }
+function removeLock() {
+  localStorage.removeItem(VP.KEY); updateLockUI(); dbg.textContent = '';
+  session = false; speak(V[lang].lockOff);
+}
+function runIntent(it) {            // it = JSON from /api/intent; returns true if handled
+  const k = it && it.intent;
+  if (!k || k === 'none') return false;
+  if (isGuest && k !== 'guest_off') { guestBlock(); return true; }
+  switch (k) {
+    case 'open': {
+      const s = (it.site || '').trim();
+      const site = SITES.find(x => x[0].test(s) || x[1].toLowerCase() === s.toLowerCase());
+      if (site) { doOpen({ name: site[1], url: site[2] }); return true; }
+      const q = (it.query || s).trim();
+      if (!q) return false;
+      doOpen({ name: q, url: 'https://www.google.com/search?q=' + encodeURIComponent(q) });
+      return true;
+    }
+    case 'play':
+      doOpen({ name: 'YouTube', url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(it.query || 'songs') });
+      return true;
+    case 'call': {
+      const hit = loadContacts().find(c => c.name.toLowerCase() === (it.name || '').trim().toLowerCase());
+      if (hit) { doContact({ type: 'call', name: hit.name, number: hit.number }); return true; }
+      const n = phoneFrom(it.number || '');
+      doContact(n ? { type: 'call', name: n, number: n } : { type: 'nocontact' });
+      return true;
+    }
+    case 'add_contact': {
+      const n = phoneFrom(it.number || ''), nm = (it.name || '').trim();
+      doContact(n && nm ? { type: 'add', name: nm, number: n } : { type: 'addfail' });
+      return true;
+    }
+    case 'list_contacts': doContact({ type: 'list' }); return true;
+    case 'end_call': session = false; speak(V[lang].cantHangup); return true;
+    case 'voice_lock_on': startEnroll(); return true;
+    case 'voice_lock_off': removeLock(); return true;
+    case 'guest_on': guestOn(); return true;
+    case 'guest_off': guestOff(); return true;
+    case 'start_quiz': startVoiceQuiz(it.query); return true;
+    case 'start_story': startVoiceStory(it.query); return true;
+    case 'start_game': startVoiceGame(); return true;
+    case 'pronunciation': startVoicePronunciation(it.query || it.name); return true;
+    case 'start_lesson': startVoiceLesson(it.query); return true;
+    case 'fill_form': startVoiceForm('start'); return true;
+    case 'cancel':
+      if (pendingUrl) { pendingUrl = null; session = false; speak(V[lang].cancelled); return true; }
+      return false;
+  }
+  return false;
+}
+// END-CMD
+
+async function aiIntent(text) {
+  try {
+    const r = await fetch('/api/intent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang, contacts: loadContacts().map(c => c.name) })
+    });
+    return r.ok ? await r.json() : null;
+  } catch (e) { return null; }
+}
+
+function addContact(name, number) {
+  const list = loadContacts().filter(c => c.name.toLowerCase() !== name.toLowerCase());
+  list.push({ name, number });
+  saveContacts(list);
+}
+function doContact(cc) {
+  session = false;
+  if (cc.type === 'add') { addContact(cc.name, cc.number); speak(V[lang].saved + cc.name); return; }
+  if (cc.type === 'addfail') { session = true; speak(V[lang].addFail); return; }
+  if (cc.type === 'nocontact') { session = true; speak(V[lang].noContact); return; }
+  if (cc.type === 'list') {
+    const l = loadContacts();
+    speak(l.length ? V[lang].contactsAre + l.map(c => c.name).join(', ') : V[lang].noContacts);
+    return;
+  }
+  const url = 'tel:' + cc.number;                 // opens the phone dialer
+  pendingUrl = url;                               // if the dialer did not open, the next tap does it
+  setTimeout(() => { if (pendingUrl === url) pendingUrl = null; }, 20000);
+  speak(V[lang].calling + cc.name + V[lang].callTap);
+  window.location.href = url;
+}
+const contactBtnEl = document.getElementById('btnAddContact') || document.getElementById('contactBtn');
+if (contactBtnEl) {
+  contactBtnEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (voiceLockOn()) { session = true; speak(V[lang].addFail); return; }
+    const name = (prompt('Contact name') || '').trim();
+    if (!name) return;
+    const num = phoneFrom(prompt('Phone number (10 digits)') || '');
+    if (!num) { alert('Please enter a valid 10 digit number'); return; }
+    addContact(name, num);
+    speak(V[lang].saved + name);
+  });
+}
+
+let pendingUrl = null;
+function doOpen(op) {
+  const w = window.open(op.url, '_blank');
+  session = false;
+  if (w) { speak(V[lang].opening + op.name); }
+  else { pendingUrl = op.url; speak(V[lang].tapToOpen + op.name); }   // popup blocked: next tap opens it
+}
+
+// ================= voice lock (demo-grade speaker check) =================
+// Compares the average "sound shape" (MFCC-style features) of the speaker with the owner's saved profile.
+// It is a hackathon demo, NOT bank-grade security. Tune with ?min=2.0&k=2.2 in the URL.
+const VP = { KEY: 'swaramVoice', K: 2.2, MIN: 2.0, MINRANGE: 8, MINFRAMES: 12, N_ENROLL: 4, DEBUG: true };
+{
+  const q = new URLSearchParams(location.search);
+  if (parseFloat(q.get('min'))) VP.MIN = parseFloat(q.get('min'));
+  if (parseFloat(q.get('k'))) VP.K = parseFloat(q.get('k'));
+  if (q.get('debug') === '0') VP.DEBUG = false;
+}
+const NMEL = 24, NCEP = 12;
+
+// BEGIN-PROFILE
+function rmsDist(a, b) { let s = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; } return Math.sqrt(s / a.length); }
+function makeProfile(vecs) {
+  const n = vecs.length;
+  const mu = vecs[0].map((_, i) => vecs.reduce((s, v) => s + v[i], 0) / n);
+  const spread = vecs.reduce((s, v) => s + rmsDist(v, mu), 0) / n;
+  return { mu, spread };
+}
+function limitOf(p) { return Math.max(p.spread * VP.K, VP.MIN); }
+// END-PROFILE
+
+const dbg = document.getElementById('dbg');
+const lockBtn = document.getElementById('btnVoiceLock') || document.getElementById('lockBtn');
+let vpCtx = null, analyser = null, spec = null, melFilters = null;
+let capTimer = null, capDelay = null, capFrames = [];
+
+function loadProfile() { try { return JSON.parse(localStorage.getItem(VP.KEY)); } catch (e) { return null; } }
+function voiceLockOn() { return !!loadProfile(); }
+function updateLockUI() {
+  const on = voiceLockOn();
+  if (lockBtn) {
+    lockBtn.setAttribute('aria-pressed', on);
+    lockBtn.textContent = on ? '🔒 Voice Lock: ON' : '🔓 Voice Lock: OFF';
+  }
+}
+
+async function initMic() {
+  if (analyser) { if (vpCtx.state === 'suspended') vpCtx.resume(); return true; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    vpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (vpCtx.state === 'suspended') vpCtx.resume();
+    analyser = vpCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.2;
+    vpCtx.createMediaStreamSource(stream).connect(analyser);
+    spec = new Float32Array(analyser.frequencyBinCount);
+    buildMel(vpCtx.sampleRate);
+    return true;
+  } catch (e) { console.error('mic init failed', e); return false; }
+}
+
+function buildMel(sr) {
+  const nb = analyser.frequencyBinCount, hz = sr / analyser.fftSize;
+  const fmin = 100, fmax = Math.min(5500, sr / 2);
+  const mel = f => 2595 * Math.log10(1 + f / 700), inv = m => 700 * (Math.pow(10, m / 2595) - 1);
+  const pts = [];
+  for (let i = 0; i < NMEL + 2; i++) pts.push(inv(mel(fmin) + (mel(fmax) - mel(fmin)) * i / (NMEL + 1)));
+  melFilters = [];
+  for (let m = 1; m <= NMEL; m++) {
+    const w = new Float32Array(nb), a = pts[m - 1], b = pts[m], c = pts[m + 1];
+    for (let k = 0; k < nb; k++) {
+      const f = k * hz;
+      if (f > a && f < b) w[k] = (f - a) / (b - a);
+      else if (f >= b && f < c) w[k] = (c - f) / (c - b);
+    }
+    melFilters.push(w);
+  }
+}
+
+function grabFrame() {
+  if (!analyser || capFrames.length > 800) return;
+  analyser.getFloatFrequencyData(spec);
+  const lm = new Array(NMEL); let e = 0;
+  for (let m = 0; m < NMEL; m++) {
+    let s = 0; const w = melFilters[m];
+    for (let k = 0; k < w.length; k++) if (w[k]) s += w[k] * Math.pow(10, Math.max(spec[k], -120) / 10);
+    lm[m] = 10 * Math.log10(s + 1e-12);
+    e += lm[m];
+  }
+  e /= NMEL;
+  const c = [];
+  for (let i = 1; i <= NCEP; i++) {
+    let s = 0;
+    for (let m = 0; m < NMEL; m++) s += lm[m] * Math.cos(Math.PI * i * (m + 0.5) / NMEL);
+    c.push(s * 2 / NMEL);
+  }
+  capFrames.push({ e, c });
+}
+
+function beginCapture() {
+  capFrames = [];
+  clearInterval(capTimer); clearTimeout(capDelay);
+  // wait a moment so the "listening" beep is not recorded as the voice
+  capDelay = setTimeout(() => { capDelay = null; if (analyser) capTimer = setInterval(grabFrame, 25); }, 250);
+}
+
+function finishCapture() {
+  clearInterval(capTimer); clearTimeout(capDelay); capTimer = null; capDelay = null;
+  const fr = capFrames; capFrames = [];
+  if (!analyser || fr.length < 20) return null;
+  const es = fr.map(f => f.e).sort((a, b) => a - b);
+  const p10 = es[Math.floor(es.length * 0.1)], p95 = es[Math.floor(es.length * 0.95)];
+  if (p95 - p10 < VP.MINRANGE) return null;                // too quiet / no clear speech
+  const cut = p10 + 0.5 * (p95 - p10);
+  const voiced = fr.filter(f => f.e >= cut);
+  if (voiced.length < VP.MINFRAMES) return null;
+  const mu = new Array(NCEP).fill(0);
+  voiced.forEach(f => f.c.forEach((x, i) => { mu[i] += x / voiced.length; }));
+  return mu;
+}
+
+function verify(vec) {
+  const p = loadProfile();
+  if (!p) return 'ok';
+  if (!analyser) return 'nomic';
+  if (!vec) return 'short';
+  const d = rmsDist(vec, p.mu), lim = limitOf(p);
+  if (VP.DEBUG) dbg.textContent = 'voice distance ' + d.toFixed(2) + ' (limit ' + lim.toFixed(2) + ')';
+  return d <= lim ? 'ok' : 'no';
+}
+
+const enroll = { active: false, vecs: [] };
+async function startEnroll() {
+  const ok = await initMic();
+  if (!ok) { session = false; speak(V[lang].noMic); return; }
+  enroll.active = true; enroll.vecs = []; session = true;
+  speak(V[lang].enrollStart);
+}
+function enrollStep(vec) {
+  if (!vec) { session = true; speak(V[lang].repeat); return; }
+  enroll.vecs.push(vec);
+  if (enroll.vecs.length < VP.N_ENROLL) { session = true; speak(V[lang].enrollNext); return; }
+  localStorage.setItem(VP.KEY, JSON.stringify(makeProfile(enroll.vecs)));
+  enroll.active = false; enroll.vecs = []; session = false;
+  updateLockUI();
+  speak(V[lang].enrollDone);
+}
+
+// returns true if this utterance was fully handled here (enrolment, lock command, or rejected voice)
+function gateCheck(text, vec) {
+  textEl.textContent = '“' + text + '”';
+  if (enroll.active) { enrollStep(vec); return true; }
+  if (!voiceLockOn()) return false;
+  const r = verify(vec);
+  if (r === 'nomic') { session = false; speak(V[lang].noMic); return true; }
+  isGuest = false;
+  if (r === 'short' && !guestActive()) { session = true; speak(V[lang].repeat); return true; }
+  if (r === 'no' && !guestActive()) {
+    const ended = guestUntil > 0; guestUntil = 0; session = false;
+    speak(ended ? V[lang].guestEnded : V[lang].mismatch);
+    return true;
+  }
+  if (r === 'no' || r === 'short') {                 // guest allowed by the owner: questions and lessons only
+    isGuest = true;
+    if (parseLockCmd(text)) { guestBlock(); return true; }
+    return false;
+  }
+  const lc = parseLockCmd(text);
+  if (lc === 'off') {
+    localStorage.removeItem(VP.KEY); updateLockUI(); dbg.textContent = '';
+    session = false; speak(V[lang].lockOff); return true;
+  }
+  if (lc === 'on') { startEnroll(); return true; }
+  return false;
+}
+
+if (lockBtn) {
+  lockBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (voiceLockOn()) { session = true; speak(V[lang].lockHow); }
+    else startEnroll();
+  });
+}
+
+let lang = localStorage.getItem('lang') || 'en-IN';
+let history = [];
+let state = 'idle';
+let session = false;      // true = auto-listen again after each spoken reply
+let rec = null;
+let speakId = 0;          // guards against stale onend events after cancel()
+let voices = [];
+
+// ---------- helpers ----------
+function loadVoices() { voices = speechSynthesis.getVoices(); }
+speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+
+function pickVoice(code) {
+  const base = code.split('-')[0];
+  return voices.find(v => v.lang === code) ||
+         voices.find(v => v.lang.replace('_', '-').startsWith(base)) || null;
+}
+
+let audioCtx;
+function beep(freq, ms) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = freq; g.gain.value = 0.15;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + ms / 1000);
+  } catch (e) {}
+}
+
+function chime() {
+  beep(880, 80);
+  setTimeout(() => beep(1318, 120), 90);
+}
+
+function setState(s) {
+  state = s;
+  document.body.dataset.state = s;
+  stateEl.textContent = T[lang][s];
+}
+
+function setLang(code) {
+  lang = code;
+  localStorage.setItem('lang', code);
+  document.documentElement.lang = code.split('-')[0];
+  if (typeof langSelect !== 'undefined' && langSelect) langSelect.value = code;
+  document.querySelectorAll('.lang').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === code));
+  if (state === 'idle') stateEl.textContent = T[lang].idle;
+}
+
+// ---------- wake word & human speech synthesis ----------
+const WAKE_WORD_RE = /\b(hey|hi|hello|ok|okay|suno|सुनो|హే|ఓయ్|నమస్తే)?\s*(swaram|shwaram|swaramu|swaramm|స్వరం|स्वरम)\b/i;
+
+const WAKE_ACKS = {
+  'te-IN': 'చెప్పండి, నేను వింటున్నాను!',
+  'hi-IN': 'हाँ, बोलिए, मैं सुन रहा हूँ!',
+  'en-IN': "Yes, I'm listening! What can I do for you?",
+  'ta-IN': 'சொல்லுங்கள், நான் கேட்கிறேன்!',
+  'kn-IN': 'ಹೇಳಿ, ನಾನು ಕೇಳುತ್ತಿದ್ದೇನೆ!',
+  'ml-IN': 'പറയൂ, ഞാൻ കേൾക്കുന്നുണ്ട്!',
+  'mr-IN': 'बोला, मी ऐकत आहे!',
+  'bn-IN': 'বলুন, আমি শুনছি!',
+  'gu-IN': 'કહો, હું સાંભળી રહ્યો છું!',
+  'pa-IN': 'ਦੱਸੋ, ਮੈਂ ਸੁਣ ਰਿਹਾ ਹਾਂ!',
+  'ur-IN': 'کہیے، میں سن رہا ہوں!'
+};
+
+let wakeWordMode = localStorage.getItem('swaramWake') !== 'false'; // default ON
+const wakeBtn = $('btnWakeWord') || $('wakeBtn');
+
+function updateWakeUI() {
+  if (!wakeBtn) return;
+  wakeBtn.setAttribute('aria-pressed', wakeWordMode);
+  wakeBtn.textContent = wakeWordMode ? '🎙️ "Hey Swaram": ON' : '🔇 "Hey Swaram": OFF';
+}
+
+if (wakeBtn) {
+  wakeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wakeWordMode = !wakeWordMode;
+    localStorage.setItem('swaramWake', wakeWordMode ? 'true' : 'false');
+    updateWakeUI();
+    if (wakeWordMode) {
+      if (state === 'idle') listen(true);
+    } else {
+      if (state === 'listening' && !session) {
+        try { rec.abort(); } catch(e) {}
+        setState('idle');
+      }
+    }
+  });
+}
+
+// ---------- session, progress & pdf notes ----------
+let sessionId = localStorage.getItem('swaramSessionId');
+if (!sessionId) {
+  sessionId = 'sess_' + Math.random().toString(36).substring(2, 10);
+  localStorage.setItem('swaramSessionId', sessionId);
+}
+
+let progressData = { questionsAnswered: 0, topicsLearned: 0, quizScore: 0, streakDays: 1 };
+try {
+  const saved = localStorage.getItem('swaramProgress');
+  if (saved) progressData = JSON.parse(saved);
+} catch(e) {}
+
+const progBtn = $('btnProgress') || $('progBtn');
+function updateProgressUI() {
+  if (!progBtn) return;
+  progBtn.textContent = `📊 Progress: ${progressData.questionsAnswered} Qs`;
+  localStorage.setItem('swaramProgress', JSON.stringify(progressData));
+}
+updateProgressUI();
+
+function announceProgress() {
+  const p = progressData;
+  let msg = `You have completed ${p.questionsAnswered} questions and ${p.topicsLearned} study modules with a ${p.streakDays} day learning streak. Excellent progress!`;
+  if (lang.startsWith('te')) {
+    msg = `మీరు ఇప్పటివరకు ${p.questionsAnswered} ప్రశ్నలు మరియు ${p.topicsLearned} స్టడీ మాడ్యూల్స్ పూర్తి చేశారు. మీ నేర్చుకునే ప్రయాణం చాలా బాగుంది!`;
+  } else if (lang.startsWith('hi')) {
+    msg = `आपने अब तक ${p.questionsAnswered} प्रश्न और ${p.topicsLearned} अध्ययन विषय पूरे किए हैं। आपकी प्रगति बहुत अच्छी है!`;
+  }
+  session = false;
+  speak(msg);
+}
+
+if (progBtn) {
+  progBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    announceProgress();
+  });
+}
+
+// PDF Notes Upload
+const pdfBtn = $('btnUploadNotes') || $('pdfBtn');
+const pdfInput = $('pdfInput');
+const activeDoc = $('activeDoc');
+const docName = $('docName');
+
+if (pdfBtn && pdfInput) {
+  pdfBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pdfInput.click();
+  });
+
+  pdfInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setState('thinking');
+    textEl.textContent = 'Uploading and indexing notes: ' + file.name + '...';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('lang', lang);
+
+    try {
+      const res = await fetch('/api/upload-pdf', {
+        method: 'POST',
+        headers: { 'X-Session-ID': sessionId },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to process PDF');
+      
+      activeDoc.style.display = 'block';
+      docName.textContent = data.filename + ' (' + data.pages + 'p)';
+      progressData.topicsLearned = (progressData.topicsLearned || 0) + 1;
+      updateProgressUI();
+      session = true;
+      speak(data.summary);
+    } catch(err) {
+      console.error(err);
+      session = false;
+      speak('Sorry, could not read this PDF. Please make sure it contains text.');
+    }
+  });
+}
+
+// Offline Mode Network Monitor
+const netStatus = $('netStatus');
+function updateOnlineStatus() {
+  const online = navigator.onLine;
+  if (!online) {
+    if (netStatus) netStatus.style.display = 'block';
+    speak('You are currently in offline mode. Voice navigation, contacts, and offline review remain active.');
+  } else {
+    if (netStatus) netStatus.style.display = 'none';
+  }
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// Screen Reader & Visual Description for Visually Impaired
+const readScreenBtn = $('btnReadScreen') || $('readScreenBtn');
+
+function describeScreen() {
+  const currentText = textEl.textContent.trim().replace(/^[“"']|[”"']$/g, '');
+  const langName = (LANG_NAMES && LANG_NAMES[lang]) || lang;
+  const isNotesLoaded = activeDoc && activeDoc.style.display !== 'none';
+  const notesInfo = isNotesLoaded ? docName.textContent : null;
+  const qCount = progressData.questionsAnswered || 0;
+
+  let desc = '';
+  if (lang.startsWith('te')) {
+    if (currentText) {
+      desc = `స్క్రీన్ చదువుతున్నాను. ప్రస్తుతం స్క్రీన్ పై ఉన్న వాక్యం: "${currentText}". `;
+    } else {
+      desc = `స్క్రీన్ పై ప్రస్తుతానికి కొత్త సమాచారం ఏమీ లేదు. స్వరం మాట్లాడటానికి సిద్ధంగా ఉంది. `;
+    }
+    desc += `ఎంచుకున్న భాష: ${langName}. ` +
+      (notesInfo ? `స్టడీ నోట్స్: ${notesInfo} లోడ్ అయి ఉన్నాయి. ` : '') +
+      `మీరు ఇప్పటివరకు ${qCount} ప్రశ్నలు ప్రాక్టీస్ చేశారు.`;
+  } else if (lang.startsWith('hi')) {
+    if (currentText) {
+      desc = `स्क्रीन पढ़ रहा हूँ। स्क्रीन पर टेक्स्ट लिखा है: "${currentText}"। `;
+    } else {
+      desc = `स्क्रीन पर अभी कोई नया टेक्स्ट नहीं है। स्वरम आपकी आवाज़ सुनने के लिए तैयार है। `;
+    }
+    desc += `चुनी गई भाषा: ${langName}। ` +
+      (notesInfo ? `स्टडी नोट्स: ${notesInfo} लोड हैं। ` : '') +
+      `आपने आज ${qCount} प्रश्न पूरे किए हैं।`;
+  } else {
+    if (currentText) {
+      desc = `Reading screen. The displayed text says: "${currentText}". `;
+    } else {
+      desc = `Reading screen. The screen is clear and Swaram is ready to listen. `;
+    }
+    desc += `Selected language is ${langName}. ` +
+      (notesInfo ? `Study notes "${notesInfo}" are open. ` : 'No study notes are loaded. ') +
+      `You have completed ${qCount} questions today.`;
+  }
+
+  session = false;
+  speak(desc);
+}
+
+if (readScreenBtn) {
+  readScreenBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    describeScreen();
+  });
+}
+
+
+// ================= AUDIO CUES (EARCONS) & SPEECH SPEED =================
+let speechRate = parseFloat(localStorage.getItem('swaramSpeechRate') || '1.0');
+let lastSpokenText = '';
+
+function playEarcon(type) {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    if (type === 'listen_start') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.11);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'listen_stop') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, now);
+      osc.frequency.exponentialRampToValueAtTime(330, now + 0.11);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (type === 'quiz_correct') {
+      [523.25, 659.25, 783.99].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.07);
+        gain.gain.setValueAtTime(0.0001, now + i * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.2, now + i * 0.07 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.07);
+        osc.stop(now + i * 0.07 + 0.22);
+      });
+    } else if (type === 'quiz_wrong') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.linearRampToValueAtTime(180, now + 0.2);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.15, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } else if (type === 'wake') {
+      [587.33, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.08);
+        gain.gain.setValueAtTime(0.0001, now + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + i * 0.08 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 0.18);
+      });
+    }
+  } catch(e) {}
+}
+
+function setSpeechRate(rate) {
+  speechRate = Math.max(0.7, Math.min(1.6, Math.round(rate * 100) / 100));
+  localStorage.setItem('swaramSpeechRate', speechRate.toString());
+  const formatted = speechRate + 'x';
+  if (lang.startsWith('te')) {
+    speak(`వాయిస్ వేగం ${formatted} కు మార్చబడింది.`);
+  } else if (lang.startsWith('hi')) {
+    speak(`बोलने की गति ${formatted} कर दी गई है।`);
+  } else {
+    speak(`Speech rate set to ${formatted}.`);
+  }
+}
+
+function repeatLastSpokenResponse() {
+  if (!lastSpokenText) {
+    speak(lang.startsWith('te') ? 'పునరావృతం చేయడానికి ముందు సమాధానం ఏమీ లేదు.' : (lang.startsWith('hi') ? 'दोहराने के लिए कोई पिछला उत्तर नहीं है।' : 'No previous response to repeat.'));
+    return;
+  }
+  speak(lastSpokenText);
+}
+
+// PDF Page Reader
+async function readPdfPageVoice(pageNumber) {
+  setState('thinking');
+  textEl.textContent = `Reading page ${pageNumber} of study notes...`;
+  try {
+    const r = await fetch('/api/pdf-page', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ page: pageNumber, lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to read page');
+    textEl.textContent = `Page ${d.page} of ${d.total_pages}: ${d.content}`;
+    speak(d.content);
+  } catch (e) {
+    speak(e.message || 'Could not read requested page.');
+  }
+}
+
+// Screen-Free Gestures for Blind Users: Double-Tap & Swipe Left
+let lastTapTime = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches && e.touches[0]) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', (e) => {
+  // Swipe Left: repeat last response
+  if (e.changedTouches && e.changedTouches[0]) {
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    const deltaY = e.changedTouches[0].clientY - touchStartY;
+    if (deltaX < -70 && Math.abs(deltaY) < 60) {
+      repeatLastSpokenResponse();
+      return;
+    }
+  }
+
+  // Double-tap anywhere to toggle listening
+  if (e.target.closest('button, a, input')) return;
+  const now = Date.now();
+  if (now - lastTapTime < 340) {
+    e.preventDefault();
+    if (state === 'listening') {
+      playEarcon('listen_stop');
+      if (rec) try { rec.stop(); } catch(err) {}
+      setState('idle');
+    } else if (state === 'speaking') {
+      stopAudio();
+      setState('idle');
+    } else {
+      session = true;
+      playEarcon('listen_start');
+      listen(false);
+    }
+    lastTapTime = 0;
+    return;
+  }
+  lastTapTime = now;
+}, { passive: false });
+
+// ================= VOCO & INTERACTIVE LEARNING MODES =================
+let activeMode = null; // null | 'quiz' | 'story' | 'form'
+let currentStoryTopic = 'a short inspiring moral story';
+let currentCourse = 'dsa';
+let currentChapter = 0;
+
+async function startVoiceQuiz(topic) {
+  activeMode = 'quiz'; if (typeof modeSelect !== 'undefined' && modeSelect) modeSelect.value = 'quiz';
+  setState('thinking');
+  const t = topic || (activeDoc && activeDoc.style.display !== 'none' ? 'the uploaded study notes' : 'general science and computing');
+  const use_pdf = activeDoc && activeDoc.style.display !== 'none';
+  textEl.textContent = 'Generating 3 voice quiz questions on: ' + t + '...';
+  try {
+    const r = await fetch('/api/quiz/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ topic: t, lang, use_pdf })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to start quiz');
+    textEl.textContent = `Question 1 of ${d.total}: ${d.question}`;
+    speak(d.question);
+  } catch (e) {
+    activeMode = null;
+    speak('Could not start quiz. Please try again.');
+  }
+}
+
+async function answerVoiceQuiz(ans) {
+  setState('thinking');
+  textEl.textContent = 'Checking answer: “' + ans + '”...';
+  try {
+    const r = await fetch('/api/quiz/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ answer: ans, lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to check answer');
+    if (d.correct) {
+      playEarcon('quiz_correct');
+    } else {
+      playEarcon('quiz_wrong');
+    }
+    if (d.finished) {
+      activeMode = null;
+      const doneMsg = `${d.feedback} Quiz completed! Your final score is ${d.score} out of ${d.total}.`;
+      textEl.textContent = doneMsg;
+      fetchProgress();
+      speak(doneMsg);
+    } else {
+      const nextMsg = `${d.feedback} Question ${d.question_number}: ${d.next_question}`;
+      textEl.textContent = nextMsg;
+      speak(nextMsg);
+    }
+  } catch (e) {
+    activeMode = null;
+    speak('Quiz error. Returning to assistant mode.');
+  }
+}
+
+async function startVoiceStory(topic, choice) {
+  activeMode = 'story'; if (typeof modeSelect !== 'undefined' && modeSelect) modeSelect.value = 'story';
+  if (topic) currentStoryTopic = topic;
+  setState('thinking');
+  try {
+    const r = await fetch('/api/story', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ topic: currentStoryTopic, choice: choice || '', lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to generate story');
+    textEl.textContent = d.story;
+    speak(d.story);
+  } catch (e) {
+    activeMode = null;
+    speak('Could not tell story. Returning to assistant mode.');
+  }
+}
+
+async function startVoiceLesson(courseName) {
+  setState('thinking');
+  currentCourse = courseName || 'dsa';
+  try {
+    const r = await fetch('/api/lesson', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ course: currentCourse, chapter: currentChapter, lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to load lesson');
+    textEl.textContent = `${d.course} - ${d.chapter}: ${d.lesson}`;
+    fetchProgress();
+    speak(d.lesson);
+  } catch (e) {
+    speak('Could not load lesson. Please try again.');
+  }
+}
+
+async function startVoicePronunciation(targetWord) {
+  setState('thinking');
+  const w = targetWord || 'entrepreneur';
+  try {
+    const r = await fetch('/api/pronunciation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ word: w, lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to get pronunciation');
+    textEl.textContent = `${d.word}: ${d.guide}`;
+    speak(d.guide);
+  } catch (e) {
+    speak('Could not check pronunciation.');
+  }
+}
+
+async function startVoiceGame() {
+  setState('thinking');
+  try {
+    const r = await fetch('/api/game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ type: 'riddle', lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Failed to load game');
+    textEl.textContent = d.reply;
+    speak(d.reply);
+  } catch (e) {
+    speak('Could not start game.');
+  }
+}
+
+async function startVoiceForm(action, value) {
+  setState('thinking');
+  try {
+    const r = await fetch('/api/form', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+      body: JSON.stringify({ action: action || 'start', value: value || '', lang })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'Form error');
+    if (d.completed) {
+      activeMode = null;
+      textEl.textContent = d.prompt;
+      speak(d.prompt);
+    } else {
+      activeMode = 'form'; if (typeof modeSelect !== 'undefined' && modeSelect) modeSelect.value = 'form';
+      textEl.textContent = d.prompt;
+      speak(d.prompt);
+    }
+  } catch (e) {
+    activeMode = null;
+    speak('Form filling error. Returning to normal mode.');
+  }
+}
+
+async function fetchProgress() {
+  try {
+    const r = await fetch('/api/progress', { headers: { 'X-Session-ID': sessionId } });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.ok && d.progress) {
+        progressData = d.progress;
+        updateProgressUI();
+      }
+    }
+  } catch(e) {}
+}
+
+const quizBtn = $('quizBtn');
+const lessonBtn = $('lessonBtn');
+const storyBtn = $('storyBtn');
+const pronounceBtn = $('pronounceBtn');
+const gameBtn = $('gameBtn');
+const formBtn = $('formBtn');
+
+if (quizBtn) quizBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoiceQuiz(); });
+if (lessonBtn) lessonBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoiceLesson(); });
+if (storyBtn) storyBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoiceStory(); });
+if (pronounceBtn) pronounceBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoicePronunciation(); });
+if (gameBtn) gameBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoiceGame(); });
+if (formBtn) formBtn.addEventListener('click', (e) => { e.stopPropagation(); startVoiceForm('start'); });
+
+
+// Policy Modal & Permissions check
+const policyModal = $('policyModal');
+const policyBtn = $('btnPolicy') || $('policyBtn');
+const closePolicyBtn = $('closePolicyBtn');
+const okPolicyBtn = $('okPolicyBtn');
+const reqMicBtn = $('reqMicBtn');
+const readPolicyBtn = $('readPolicyBtn');
+const micStatusText = $('micStatusText');
+
+async function checkMicPermission() {
+  if (!micStatusText) return;
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      const p = await navigator.permissions.query({ name: 'microphone' });
+      if (p.state === 'granted') {
+        micStatusText.textContent = '✅ Microphone access is ALLOWED. Swaram is ready to listen.';
+        micStatusText.style.color = '#00e676';
+      } else if (p.state === 'prompt') {
+        micStatusText.textContent = '⏳ Microphone access needs approval. Click button below to allow.';
+        micStatusText.style.color = '#ffd400';
+      } else {
+        micStatusText.textContent = '❌ Microphone is BLOCKED in browser. Click lock icon in Chrome address bar to Allow.';
+        micStatusText.style.color = '#ff5252';
+      }
+    }
+  } catch(e) {}
+}
+
+function openPolicy() {
+  if (!policyModal) return;
+  policyModal.style.display = 'flex';
+  checkMicPermission();
+}
+
+function closePolicy() {
+  if (!policyModal) return;
+  policyModal.style.display = 'none';
+}
+
+if (policyBtn) policyBtn.addEventListener('click', (e) => { e.stopPropagation(); openPolicy(); });
+if (closePolicyBtn) closePolicyBtn.addEventListener('click', (e) => { e.stopPropagation(); closePolicy(); });
+if (okPolicyBtn) okPolicyBtn.addEventListener('click', (e) => { e.stopPropagation(); closePolicy(); startBackgroundKeepAlive(); });
+if (reqMicBtn) reqMicBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    checkMicPermission();
+    startBackgroundKeepAlive();
+    speak('Microphone permission granted successfully.');
+  } catch(err) {
+    if (micStatusText) {
+      micStatusText.textContent = '❌ Blocked. Click lock icon in Chrome address bar to Allow.';
+      micStatusText.style.color = '#ff5252';
+    }
+  }
+});
+if (readPolicyBtn) readPolicyBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  speak('Swaram User Policy. Swaram is an accessibility-first voice tutor. Audio is processed solely for real-time answers, never recorded or sold. Contacts and notes remain private on your device. Swaram runs hands-free in the background like Siri to respond whenever you call Hey Swaram.');
+});
+
+// Siri-style Background Keep-Alive Audio loop & WakeLock
+let keepAliveAudio = null;
+function startBackgroundKeepAlive() {
+  try {
+    if (!keepAliveAudio) {
+      const actx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      keepAliveAudio = actx;
+    }
+    if (keepAliveAudio.state === 'suspended') {
+      keepAliveAudio.resume();
+    }
+  } catch(e) {}
+  
+  if ('wakeLock' in navigator) {
+    navigator.wakeLock.request('screen').catch(() => {});
+  }
+}
+
+// ---------- speak with natural human neural voice ----------
+let currentAudio = null;
+function stopAudio() {
+  speakId++;
+  speechSynthesis.cancel();
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    } catch(e) {}
+    currentAudio = null;
+  }
+}
+
+function speak(text) {
+  speakId++;
+  const myId = speakId;
+  lastSpokenText = text;
+  speechSynthesis.cancel();
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+    } catch(e) {}
+    currentAudio = null;
+  }
+  
+  textEl.textContent = text;
+  setState('speaking');
+
+  let finished = false;
+  const done = () => {
+    if (finished || myId !== speakId) return;
+    finished = true;
+    if (currentAudio) {
+      try { currentAudio.pause(); } catch(e) {}
+      currentAudio = null;
+    }
+    if (session) {
+      setTimeout(() => { if (session && myId === speakId) listen(false); }, 300);
+    } else {
+      setState('idle');
+      if (wakeWordMode) {
+        setTimeout(() => { if (wakeWordMode && state === 'idle') listen(true); }, 400);
+      }
+    }
+  };
+
+  // Offline fallback - use browser speech immediately without network attempt
+  if (!navigator.onLine) {
+    fallbackBrowserSpeak(text, myId, done);
+    return;
+  }
+
+  // Primary: Ultra-realistic Neural Human Voice
+  try {
+    const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}`;
+    const audio = new Audio(audioUrl);
+    audio.playbackRate = speechRate;
+    currentAudio = audio;
+    
+    audio.onplay = () => {
+      if (myId === speakId) setState('speaking');
+    };
+    audio.onended = () => {
+      done();
+    };
+    audio.onerror = (err) => {
+      console.warn('Neural audio failed, using browser speech synthesis', err);
+      fallbackBrowserSpeak(text, myId, done);
+    };
+
+    const p = audio.play();
+    if (p !== undefined) {
+      p.catch((err) => {
+        console.warn('audio.play() rejected:', err);
+        fallbackBrowserSpeak(text, myId, done);
+      });
+    }
+  } catch (e) {
+    fallbackBrowserSpeak(text, myId, done);
+  }
+}
+
+function fallbackBrowserSpeak(text, myId, done) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  const v = pickVoice(lang);
+  if (v) u.voice = v;
+  u.rate = speechRate;
+  u.onstart = () => { if (myId === speakId) setState('speaking'); };
+  u.onend = done;
+  u.onerror = done;
+  
+  const estDuration = Math.max(2500, (text.split(' ').length / 2) * 1000 + 2000);
+  setTimeout(() => {
+    if (myId === speakId && state === 'speaking') done();
+  }, estDuration);
+  
+  speechSynthesis.speak(u);
+}
+
+// ---------- listen (supports background Hey Swaram wake-word) ----------
+let isWakeWaiting = false;
+
+function listen(wakeWait = false) {
+  if (!SR) { 
+    setState('idle'); 
+    textEl.textContent = 'Please open this app in Google Chrome for voice support.'; 
+    return; 
+  }
+  stopAudio();
+  
+  if (rec) {
+    try { rec.abort(); } catch(e) {}
+  }
+  
+  isWakeWaiting = wakeWait;
+  rec = new SR();
+  rec.lang = SR_LANG[lang] || lang;
+  rec.interimResults = true;
+  rec.continuous = isWakeWaiting; // continuous in background wake mode
+  rec.maxAlternatives = 1;
+  let got = false;
+  let finalHeard = '';
+  
+  rec.onstart = () => { 
+    if (isWakeWaiting) {
+      document.body.dataset.state = 'idle';
+      stateEl.textContent = 'Say "Hey Swaram" or tap anywhere';
+    } else {
+      setState('listening'); 
+      playEarcon('listen_start'); 
+      beginCapture(); 
+    }
+  };
+  
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; ++i) {
+      const res = e.results[i];
+      if (res.isFinal) {
+        finalHeard += res[0].transcript;
+      } else {
+        interim += res[0].transcript;
+      }
+    }
+    const current = (finalHeard || interim).trim();
+
+    // Check for Wake Word "Hey Swaram" in background or idle state
+    if (isWakeWaiting || (state === 'idle' && current)) {
+      if (WAKE_WORD_RE.test(current)) {
+        got = true;
+        isWakeWaiting = false;
+        chime();
+        try { rec.abort(); } catch(err) {}
+        
+        // Extract command if spoken in same sentence (e.g. "Hey Swaram what is today's date")
+        const command = current.replace(WAKE_WORD_RE, '').trim();
+        session = true;
+        
+        if (command.length > 2) {
+          textEl.textContent = '“' + command + '”';
+          handle(command, null);
+        } else {
+          const ack = WAKE_ACKS[lang] || WAKE_ACKS['en-IN'];
+          speak(ack);
+        }
+        return;
+      }
+      return; // Still waiting for wake word
+    }
+
+    // Active conversation listening
+    if (current) {
+      textEl.textContent = '“' + current + '”';
+    }
+    if (finalHeard.trim()) {
+      got = true;
+      const vec = finishCapture();
+      const sentence = finalHeard.trim();
+      finalHeard = '';
+      try { rec.stop(); } catch(err) {}
+      handle(sentence, vec);
+    }
+  };
+  
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      textEl.textContent = 'Microphone permission blocked. Please allow microphone in Chrome address bar.';
+      session = false;
+      setState('idle');
+    }
+  };
+  
+  rec.onend = () => {
+    if (!got && state === 'listening' && !isWakeWaiting) {
+      finishCapture();
+      session = false; 
+      setState('idle'); 
+    }
+    // Background wake word auto-restart:
+    if (wakeWordMode && state === 'idle' && !currentAudio) {
+      setTimeout(() => {
+        if (wakeWordMode && state === 'idle' && !currentAudio) {
+          listen(true);
+        }
+      }, 300);
+    }
+  };
+  
+  try { 
+    rec.start(); 
+  } catch (e) {
+    if (!isWakeWaiting) setState('idle');
+  }
+}
+
+// ---------- handle user speech ----------
+function detectLangCommand(text) {
+  const t = text.toLowerCase().trim();
+  if (t.split(/\s+/).length > 5) return null;
+  if (/telugu|తెలుగు|तेलुगु|తెలుగులో/.test(t)) return 'te-IN';
+  if (/hindi|हिंदी|हिन्दी|హిందీ/.test(t)) return 'hi-IN';
+  if (/english|इंग्लिश|अंग्रेज़ी|अंग्रेजी|ఇంగ్లీష్/.test(t)) return 'en-IN';
+  if (/tamil|தமிழ்|तमिल|తమిళం/.test(t)) return 'ta-IN';
+  if (/kannada|ಕನ್ನಡ|कन्नड|కన్నడ/.test(t)) return 'kn-IN';
+  if (/malayalam|മലയാളം|मलयालम|మలయాళం/.test(t)) return 'ml-IN';
+  if (/marathi|मराठी|మరాఠీ/.test(t)) return 'mr-IN';
+  if (/bengali|bangla|বাংলা|बंगाली|బెంగాలీ/.test(t)) return 'bn-IN';
+  if (/gujarati|ગુજરાતી|गुजराती|గుజరాతీ/.test(t)) return 'gu-IN';
+  if (/punjabi|ਪੰਜਾਬੀ|पंजाबी|పంజాబీ/.test(t)) return 'pa-IN';
+  if (/urdu|اردو|उर्दू|ఉర్దూ/.test(t)) return 'ur-IN';
+  return null;
+}
+
+function handleOffline(text) {
+  const t = text.toLowerCase();
+  textEl.textContent = '“' + text + '”';
+  if (/time|సమయం|समय/.test(t)) {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    speak('The current time is ' + now);
+    return;
+  }
+  if (/date|తేదీ|तारीख|दिनांक/.test(t)) {
+    const today = new Date().toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    speak('Today is ' + today);
+    return;
+  }
+  if (/\b(progress|my score|stats|report)\b|ప్రోగ్రెస్|స్కోరు|प्रगति|स्कोर/i.test(t)) {
+    announceProgress();
+    return;
+  }
+  if (/\b(read|describe|tell me|check|what('s| is)?)\s*(the |my )?(screen|web|page|display)\b|\b(screen|display)\s*(read|reading)\b|స్క్రీన్\s*(చదువు|పై\s*ఏముంది|లో\s*ఏముంది)|చదువు\s*స్క్రీన్|వెబ్‌లో\s*ఏమి\s*కనిపిస్తోంది|स्क्रीन\s*(पढ़ो|पर\s*क्या\s*है|पर\s*क्या\s*दिख\s*रहा|पढ़कर\s*सुनाओ)/i.test(t)) {
+    describeScreen();
+    return;
+  }
+  const cc = parseCall(text);
+  if (cc) { doContact(cc); return; }
+  const op = parseOpen(text);
+  if (op) { doOpen(op); return; }
+
+  if (/quiz|క్విజ్|क्विज़/.test(t)) {
+    speak('Offline tip: You only enter your UPI PIN to pay or send money, never to receive money.');
+    return;
+  }
+
+  speak('You are currently offline. Voice navigation, clock, contacts, and offline tips are active. Reconnect to internet for full Gemini notes Q and A.');
+}
+
+async function handle(text, vec) {
+  if (gateCheck(text, vec)) return;
+  textEl.textContent = '“' + text + '”';
+
+  if (!navigator.onLine) {
+    handleOffline(text);
+    return;
+  }
+
+  const newLang = detectLangCommand(text);
+  if (newLang && newLang !== lang) {
+    setState('thinking');
+    await ensureStrings(newLang);
+    setLang(newLang);
+    session = true;
+    speak(T[lang].selected);
+    return;
+  }
+
+  // Mode exit / cancellation
+  if (activeMode && /\b(stop|cancel|exit|quit|end)\b|ముగించు|ఆపు|రద్దు|बंद|रद्द/i.test(text)) {
+    activeMode = null;
+    speak(lang.startsWith('te') ? 'ముగించబడింది.' : (lang.startsWith('hi') ? 'समाप्त किया गया।' : 'Mode ended. Returning to assistant.'));
+    return;
+  }
+
+  // Active Mode dispatch
+  if (activeMode === 'quiz') {
+    await answerVoiceQuiz(text);
+    return;
+  }
+  if (activeMode === 'story') {
+    await startVoiceStory(null, text);
+    return;
+  }
+  if (activeMode === 'form') {
+    await startVoiceForm('answer', text);
+    return;
+  }
+
+  // Speed control voice triggers
+  if (/\b(speak|talk)\s*(slower|slow)\b|నెమ్మదిగా\s*(మాట్లాడు|చెప్పు)|धीरे\s*(बोलो|बोलिए)/i.test(text)) {
+    setSpeechRate(Math.max(0.75, speechRate - 0.2));
+    return;
+  }
+  if (/\b(speak|talk)\s*(faster|fast|quick)\b|వేగంగా\s*(మాట్లాడు|చెప్పు)|तेज़\s*(बोलो|बोलिए)|जल्दी\s*बोलो/i.test(text)) {
+    setSpeechRate(Math.min(1.5, speechRate + 0.2));
+    return;
+  }
+  if (/\b(normal|default)\s*speed\b|సాధారణ\s*వేగం|सामान्य\s*गति/i.test(text)) {
+    setSpeechRate(1.0);
+    return;
+  }
+
+  // Repeat last spoken response
+  if (/\b(repeat|say that again|say again|what did you say)\b|మళ్ళీ చెప్పు|మరోసారి|फिर से बोलो|दोहराओ/i.test(text)) {
+    repeatLastSpokenResponse();
+    return;
+  }
+
+  // PDF Page Reader voice triggers
+  const PAGE_RE = /\b(read|open|explain)?\s*page\s*(\d+)\b|పేజీ\s*(\d+)\s*(చదువు)?|पेज\s*(\d+)\s*(पढ़ो)?/i;
+  const pm = text.match(PAGE_RE);
+  if (pm) {
+    const pnum = parseInt(pm[2] || pm[3] || pm[5] || '1', 10);
+    readPdfPageVoice(pnum);
+    return;
+  }
+
+  // Voice triggers for learning and interactive modes
+  if (/\b(start|take|play|do)?\s*(a\s*)?quiz\b|క్విజ్|క్విజ్జ్|క్విజ్ ప్రారంభించు|क्विज़|प्रश्नोत्तरी/i.test(text)) {
+    let topic = text.replace(/.*(quiz (on|about)|క్విజ్|క్విజ్జ్|क्विज़)/i, '').trim();
+    startVoiceQuiz(topic);
+    return;
+  }
+
+  if (/\b(tell|narrate|start|read)?\s*(me\s*)?(a\s*)?story\b|కథ\s*చెప్పు|కథ|कहानी\s*सुनाओ|कहानी/i.test(text)) {
+    let topic = text.replace(/.*(story (about|of)|కథ|कहानी)/i, '').trim();
+    startVoiceStory(topic);
+    return;
+  }
+
+  if (/\b(teach|learn|start|lesson|chapter)\s*(me\s*)?(python|dsa|data structures|algorithms)?\b|పాఠం\s*చెప్పు|నేర్పించు|पाठ\s*(पढ़ाओ|सिखाओ)/i.test(text)) {
+    const course = /dsa|data structures|algorithms/i.test(text) ? 'dsa' : 'python';
+    startVoiceLesson(course);
+    return;
+  }
+
+  if (/\b(how to pronounce|pronounce|pronunciation (of)?)\s+(.+)\b|ఉచ్చారణ\s+(.+)|उच्चारण\s+(.+)/i.test(text)) {
+    const m = text.match(/(?:pronounce|pronunciation (?:of)?|ఉచ్చారణ|उच्चारण)\s+([a-zA-Z\u0C00-\u0C7F\u0900-\u097F]+)/i);
+    const word = m ? m[1] : 'accessibility';
+    startVoicePronunciation(word);
+    return;
+  }
+
+  if (/\b(riddle|game|play a game|ask me a riddle)\b|ఆట|పొడుపు\s*కథ|पहेली/i.test(text)) {
+    startVoiceGame();
+    return;
+  }
+
+  if (/\b(fill|start)?\s*(a\s*)?(voice\s*)?form\b|ఫారమ్|ఫార్మ్|फॉर्म\s*भरो|फॉर्म/i.test(text)) {
+    startVoiceForm('start');
+    return;
+  }
+
+  // Voice triggers for PDF notes upload & progress
+  if (/\b(upload|open)\s*(pdf|notes?|document|book|file)\b|నోట్స్\s*(అప్‌లోడ్|ఓపెన్)|नोट्स\s*(अपलोड|खोल)/i.test(text)) {
+    if (pdfInput) pdfInput.click();
+    session = false;
+    speak(lang.startsWith('te') ? 'దయచేసి మీ పిడిఎఫ్ నోట్స్ ఎంచుకోండి.' : (lang.startsWith('hi') ? 'कृपया अपने अध्ययन नोट्स पीडीएफ चुनें।' : 'Please choose your study notes PDF to upload.'));
+    return;
+  }
+
+  if (/\b(progress|my score|stats|report)\b|ప్రోగ్రెస్|స్కోరు|ప్రగతి|प्रगति|स्कोर/i.test(text)) {
+    announceProgress();
+    return;
+  }
+
+  // Voice trigger: "Read screen", "What is displaying in the web", etc.
+  const READ_SCREEN_RE = /\b(read|describe|tell me|check|what('s| is)?)\s*(the |my )?(screen|web|page|display)\b|\b(screen|display)\s*(read|reading)\b|స్క్రీన్\s*(చదువు|పై\s*ఏముంది|లో\s*ఏముంది)|చదువు\s*స్క్రీన్|వెబ్‌లో\s*ఏమి\s*కనిపిస్తోంది|स्क्रीन\s*(पढ़ो|पर\s*क्या\s*है|पर\s*क्या\s*दिख\s*रहा|पढ़कर\s*सुनाओ)/i;
+  if (READ_SCREEN_RE.test(text)) {
+    describeScreen();
+    return;
+  }
+
+  // Voice trigger: "Help", "What can I say", etc.
+  const HELP_RE = /\b(help|commands|what can (i|you) (say|do)|how (to|do i) use)\b|ఎలా\s*వాడాలి|సహాయం|मदद|क्या\s*(बोलूँ|कर\s*सकते)/i;
+  if (HELP_RE.test(text)) {
+    let helpMsg = '';
+    if (lang.startsWith('te')) {
+      helpMsg = "స్వరంలో ముఖ్యమైన వాయిస్ ఆదేశాలు: 'స్క్రీన్ చదువు' అంటే స్క్రీన్ పై ఉన్నది చదువుతుంది. 'నోట్స్ అప్‌లోడ్' అంటే పిడిఎఫ్ నోట్స్ చదువుతుంది. 'క్విజ్ ప్రారంభించు' అంటే వాయిస్ క్విజ్. 'కథ చెప్పు' అంటే కథ వినవచ్చు. 'పైథాన్ నేర్పించు' అంటే పాఠం చెబుతుంది. 'నా ప్రోగ్రెస్' అంటే మీ స్కోరు చెబుతుంది.";
+    } else if (lang.startsWith('hi')) {
+      helpMsg = "स्वरम के मुख्य वॉइस कमांड: 'स्क्रीन पढ़ो' बोलकर स्क्रीन का टेक्स्ट सुनें। 'नोट्स अपलोड' बोलकर नोट्स पढ़ें। 'क्विज़ शुरू करो' बोलकर क्विज़ खेलें। 'कहानी सुनाओ' बोलकर कहानी सुनें। 'पायथन सिखाओ' बोलकर पाठ सीखें। 'मेरी प्रगति' बोलकर अपना स्कोर जानें।";
+    } else {
+      helpMsg = "Key Swaram voice commands: Say 'Read screen' to hear what is displayed. Say 'Start quiz' to test your knowledge. Say 'Teach me Python' or 'Teach me DSA' for voice lessons. Say 'Tell me a story' for interactive stories. Say 'Upload notes' to study from PDF. Say 'What is my progress' to check your learning score.";
+    }
+    session = false;
+    speak(helpMsg);
+    return;
+  }
+
+  const gc = parseGuest(text);                       // owner allows / stops a guest
+  if (gc === 'off') { guestOff(); return; }
+  if (gc === 'on') { if (isGuest) guestBlock(); else guestOn(); return; }
+  if (ENDV.test(text)) { session = false; speak(V[lang].cantHangup); return; }
+  if (pendingUrl && CANCELV.test(text)) { pendingUrl = null; session = false; speak(V[lang].cancelled); return; }
+  const cc = parseCall(text);
+  if (cc) { if (isGuest) guestBlock(); else doContact(cc); return; }
+  const op = parseOpen(text);
+  if (op) { if (isGuest) guestBlock(); else doOpen(op); return; }
+  if (!BASE_LANGS.includes(lang)) {                  // other languages: Gemini works out the command
+    setState('thinking');
+    const it = await aiIntent(text);
+    if (it && runIntent(it)) return;
+  }
+  setState('thinking'); beep(440, 120);
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-Session-ID': sessionId
+      },
+      body: JSON.stringify({ message: text, lang, history })
+    });
+    const data = await r.json();
+    if (!r.ok || !data.reply) throw new Error(data.error || 'bad reply');
+    history.push({ role: 'user', text }, { role: 'model', text: data.reply });
+    progressData.questionsAnswered = (progressData.questionsAnswered || 0) + 1;
+    updateProgressUI();
+    speak(data.reply);
+  } catch (e) {
+    console.error(e);
+    session = false;
+    speak(T[lang].err);
+  }
+}
+
+// ---------- tap anywhere ----------
+async function onTap() {
+  if (state === 'thinking') return;
+  if (pendingUrl) { 
+    const u = pendingUrl; 
+    pendingUrl = null; 
+    if (u.startsWith('tel:')) location.href = u; 
+    else window.open(u, '_blank'); 
+    setState('idle'); 
+    return; 
+  }
+  if (state === 'idle') {
+    session = true;
+    startBackgroundKeepAlive();
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch(e) {}
+    if (voiceLockOn()) await initMic();
+    if (history.length === 0 && !textEl.dataset.greeted) { 
+      textEl.dataset.greeted = '1'; 
+      speak(T[lang].greet); 
+    } else {
+      listen();
+    }
+  } else if (state === 'listening') {      // pause the session
+    session = false;
+    try { rec.abort(); } catch (e) {}
+    finishCapture();
+    setState('idle');
+    textEl.textContent = 'Paused. Tap anywhere to speak.';
+  } else if (state === 'speaking') {       // interrupt and ask immediately like Alexa
+    session = true;
+    stopAudio();
+    listen();
+  }
+}
+
+document.body.addEventListener('click', (e) => {
+  if (e.target.closest('.top-bar, .tools-drawer, .pill-select, .icon-btn, .tool-chip, .lang, .lockbtn, #policyModal, select, button')) return;
+  onTap();
+});
+document.querySelectorAll('.lang').forEach(b => b.addEventListener('click', async () => {
+  await ensureStrings(b.dataset.lang);
+  setLang(b.dataset.lang);
+  session = true;
+  speak(T[lang].selected);
+}));
+document.addEventListener('keydown', (e) => {
+  if ((e.key === ' ' || e.key === 'Enter') && !e.target.closest('.lang, .lockbtn')) { e.preventDefault(); onTap(); }
+});
+
+
+// ================= TOP BAR & DRAWER WIRING =================
+const toolsToggle = $('toolsToggle');
+const toolsDrawer = $('toolsDrawer');
+const langSelect = $('langSelect');
+const modeSelect = $('modeSelect');
+const btnAddContact = $('btnAddContact');
+
+if (toolsToggle && toolsDrawer) {
+  toolsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toolsDrawer.classList.toggle('open');
+  });
+}
+
+if (langSelect) {
+  langSelect.value = lang;
+  langSelect.addEventListener('change', async (e) => {
+    const newLang = e.target.value;
+    if (newLang && newLang !== lang) {
+      setState('thinking');
+      await ensureStrings(newLang);
+      setLang(newLang);
+      session = true;
+      speak(T[lang].selected);
+    }
+  });
+}
+
+if (modeSelect) {
+  modeSelect.addEventListener('change', (e) => {
+    const mode = e.target.value;
+    if (mode === 'chat') {
+      activeMode = null;
+      speak(lang.startsWith('te') ? 'వాయిస్ చాట్ మోడ్ సిద్ధంగా ఉంది. ఏదైనా అడగండి.' : (lang.startsWith('hi') ? 'वॉयस चैट मोड तैयार है। कुछ भी पूछिए।' : 'Voice chat mode active. Ask me anything.'));
+    } else if (mode === 'quiz') {
+      startVoiceQuiz();
+    } else if (mode === 'lesson') {
+      startVoiceLesson();
+    } else if (mode === 'story') {
+      startVoiceStory();
+    } else if (mode === 'pronounce') {
+      startVoicePronunciation();
+    } else if (mode === 'game') {
+      startVoiceGame();
+    } else if (mode === 'form') {
+      startVoiceForm('start');
+    }
+  });
+}
+
+
+setLang(lang);
+setState('idle');
+updateLockUI();
+updateWakeUI();
+ensureStrings(lang).then(() => { setLang(lang); if (state === 'idle') setState('idle'); });
+
+// Start background wake-word listening on startup if enabled
+if (wakeWordMode) {
+  setTimeout(() => {
+    if (wakeWordMode && state === 'idle' && !currentAudio) {
+      listen(true);
+    }
+  }, 1000);
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+</script>
+</body>
+</html>
