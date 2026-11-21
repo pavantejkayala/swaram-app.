@@ -109,6 +109,7 @@
     <button class="tool-chip" id="btnProgress">📊 Progress: 0 Qs</button>
     <button class="tool-chip" id="btnReadScreen">🔊 Read Screen</button>
     <button class="tool-chip" id="btnVoiceLock">🔒 Voice Lock: OFF</button>
+    <button class="tool-chip" id="btnImportContacts" aria-label="Import Contacts from Phone">📲 Import Contacts</button>
     <button class="tool-chip" id="btnAddContact">👤 Add Contact</button>
     <button class="tool-chip" id="btnPolicy">🛡️ Policy & Mic</button>
     <button class="tool-chip" id="btnAboutTeam">👥 Team & Story</button>
@@ -154,10 +155,11 @@
         <span>🛡️ Permissions & User Policy</span>
         <button id="closePolicyBtn" style="background:none; border:none; color:#fff; font-size:1.8rem; cursor:pointer;" aria-label="Close dialog">&times;</button>
       </h2>
-      <div style="margin-bottom:16px; padding:12px; background:#1e1e1e; border:1px solid #333; border-radius:10px;">
-        <h4 style="margin:0 0 6px; color:#00e676; font-size:1rem;">🎙️ Microphone Permission</h4>
-        <div id="micStatusText" style="font-size:0.95rem; margin-bottom:10px; color:#bbb;">Checking microphone access...</div>
-        <button id="reqMicBtn" style="padding:10px 18px; font-weight:bold; background:#00e676; color:#000; border:none; border-radius:8px; cursor:pointer; font-size:0.95rem;">Check & Allow Microphone</button>
+      <div style="margin-bottom:16px; padding:14px; background:#1e1e1e; border:1px solid #00e676; border-radius:12px;">
+        <h4 style="margin:0 0 6px; color:#00e676; font-size:1.05rem;">🚀 Quick Setup for Voice & Hands-Free Learners</h4>
+        <div style="font-size:0.88rem; color:#ccc; margin-bottom:10px;">One tap grants Microphone for talking, GPS for turn-by-turn directions, and Screen Wake Lock to keep "Hey Swaram" listening hands-free.</div>
+        <button id="btnAllowAllPermissions" style="width:100%; padding:12px; font-weight:bold; background:#00e676; color:#000; border:none; border-radius:10px; cursor:pointer; font-size:1rem; box-shadow:0 0 12px rgba(0,230,118,0.4);">🚀 Allow All Permissions (Mic, GPS, Screen Lock)</button>
+        <div id="micStatusText" style="font-size:0.9rem; margin-top:10px; color:#bbb;">Checking permissions...</div>
       </div>
       <h3 style="color:#ffd400; margin:14px 0 6px; font-size:1.1rem;">Privacy Promise & Siri-Style Background Operation</h3>
       <p style="line-height:1.55; color:#ccc; font-size:0.9rem;">
@@ -178,9 +180,6 @@
     <div id="netStatus" style="display:none; padding:4px 12px; background:#e65100; color:#fff; border-radius:12px; font-weight:bold; font-size:0.95rem;" role="alert">📶 Offline Mode Active (Local Voice Ready)</div>
     <div id="activeDoc" style="display:none; padding:4px 14px; background:#1b5e20; color:#a5d6a7; border-radius:14px; font-weight:bold; font-size:0.95rem;">📄 Notes: <span id="docName"></span></div>
     <button id="voiceOrb" class="orb" type="button" aria-label="Tap or press Space to talk to Swaram" aria-live="polite"></button>
-    <div id="state" role="status" aria-live="polite">Tap anywhere or say "Hey Swaram"</div>
-    <div id="text" role="region" aria-live="assertive" aria-atomic="true"></div>
-  </main>
     <div id="state" role="status" aria-live="polite">Tap anywhere or say "Hey Swaram"</div>
     <div id="text" role="region" aria-live="assertive" aria-atomic="true"></div>
   </main>
@@ -375,13 +374,27 @@ const CALLV = /\b(call|dial|phone|ring)\b|కాల్|ఫోన్ చేయి
 const ADDV = /\b(save|add)\s+(a\s+)?(new\s+)?contact\b|కాంటాక్ట్\s*(యాడ్|సేవ్)|कॉन्टैक्ट\s*(जोड़|जोड|सेव|add)\S*|संपर्क\s*(जोड़|जोड|सेव)\S*/i;
 const LISTV = /\b(list|read|tell)\b.*\bcontacts?\b|\bmy contacts\b|కాంటాక్ట్స్|कॉन्टैक्ट्स|मेरे संपर्क/i;
 const CONTACT_KEY = 'swaramContacts';
-function loadContacts() { try { return JSON.parse(localStorage.getItem(CONTACT_KEY)) || []; } catch (e) { return []; } }
+const DEFAULT_CONTACTS = [
+  { name: "Mom", number: "+919876543210" },
+  { name: "Dad", number: "+919876543211" },
+  { name: "Emergency", number: "112" }
+];
+function loadContacts() {
+  try {
+    const list = JSON.parse(localStorage.getItem(CONTACT_KEY));
+    if (list && Array.isArray(list) && list.length > 0) return list;
+    localStorage.setItem(CONTACT_KEY, JSON.stringify(DEFAULT_CONTACTS));
+    return DEFAULT_CONTACTS;
+  } catch (e) {
+    return DEFAULT_CONTACTS;
+  }
+}
 function saveContacts(c) { localStorage.setItem(CONTACT_KEY, JSON.stringify(c)); }
 function phoneFrom(text) {
   const d = (text.match(/[\d\s\-+]+/g) || []).join('').replace(/\D/g, '');
   if (d.length === 10) return '+91' + d;
   if (d.length === 12 && d.startsWith('91')) return '+' + d;
-  if (['100', '101', '102', '108', '112', '1098'].includes(d)) return d;   // emergency numbers
+  if (['100', '101', '102', '108', '112', '1098'].includes(d)) return d;
   return null;
 }
 function parseCall(text) {
@@ -395,13 +408,24 @@ function parseCall(text) {
   }
   if (LISTV.test(t) && !CALLV.test(t)) return { type: 'list' };
   if (!CALLV.test(t)) return null;
-  const hit = loadContacts().find(c => tl.includes(c.name.toLowerCase()));
+
+  const contacts = loadContacts();
+  const cleanTarget = t.replace(new RegExp(CALLV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  const cleanTargetL = cleanTarget.toLowerCase();
+
+  const hit = contacts.find(c => {
+    const cn = c.name.toLowerCase();
+    return tl.includes(cn) || (cleanTargetL && (cleanTargetL.includes(cn) || cn.includes(cleanTargetL)));
+  });
   if (hit) return { type: 'call', name: hit.name, number: hit.number };
+
   const num = phoneFrom(t);
   if (num) return { type: 'call', name: num, number: num };
-  const rest = t.replace(new RegExp(CALLV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
-  if (rest && rest.split(' ').length <= 3) return { type: 'nocontact' };
-  return null;                                  // long sentence = a lesson request
+
+  if (cleanTarget && cleanTarget.split(' ').length <= 4) {
+    return { type: 'nocontact', name: cleanTarget };
+  }
+  return null;
 }
 // END-CALL
 
@@ -490,20 +514,71 @@ function addContact(name, number) {
   list.push({ name, number });
   saveContacts(list);
 }
+async function importPhoneContacts() {
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const props = ['name', 'tel'];
+      const contacts = await navigator.contacts.select(props, { multiple: true });
+      if (contacts && contacts.length) {
+        let current = loadContacts();
+        let addedCount = 0;
+        for (const c of contacts) {
+          const name = Array.isArray(c.name) ? c.name[0] : c.name;
+          const tel = Array.isArray(c.tel) ? c.tel[0] : c.tel;
+          if (name && tel) {
+            const cleanTel = phoneFrom(tel) || tel.replace(/[^\d+]/g, '');
+            current = current.filter(x => x.name.toLowerCase() !== name.toLowerCase());
+            current.push({ name: name.trim(), number: cleanTel });
+            addedCount++;
+          }
+        }
+        saveContacts(current);
+        const msg = `${addedCount} contacts imported successfully.`;
+        speak(msg);
+        return;
+      }
+    } catch (err) {
+      console.warn('Contact picker error:', err);
+    }
+  }
+  const name = (prompt('Contact Name (e.g. Mom, Dad, Emergency):') || '').trim();
+  if (!name) return;
+  const numRaw = prompt('Phone number:') || '';
+  const cleanTel = phoneFrom(numRaw) || numRaw.replace(/[^\d+]/g, '');
+  if (!cleanTel || cleanTel.length < 3) {
+    alert('Please enter a valid phone number.');
+    return;
+  }
+  addContact(name, cleanTel);
+  const msg = `${name} saved to contacts.`;
+  speak(msg);
+}
+
 function doContact(cc) {
   session = false;
   if (cc.type === 'add') { addContact(cc.name, cc.number); speak(V[lang].saved + cc.name); return; }
   if (cc.type === 'addfail') { session = true; speak(V[lang].addFail); return; }
-  if (cc.type === 'nocontact') { session = true; speak(V[lang].noContact); return; }
+  if (cc.type === 'nocontact') {
+    session = true;
+    let notFoundMsg = `I couldn't find ${cc.name || 'that contact'} in your contacts. Please add them first.`;
+    if (lang.startsWith('te')) notFoundMsg = `${cc.name || 'కాంటాక్ట్'} మీ కాంటాక్ట్స్‌లో కనబడలేదు. దయచేసి ముందుగా సేవ్ చేయండి.`;
+    if (lang.startsWith('hi')) notFoundMsg = `${cc.name || 'संपर्क'} आपके संपर्कों में नहीं मिला। कृपया पहले जोड़ें।`;
+    speak(notFoundMsg);
+    return;
+  }
   if (cc.type === 'list') {
     const l = loadContacts();
     speak(l.length ? V[lang].contactsAre + l.map(c => c.name).join(', ') : V[lang].noContacts);
     return;
   }
-  const url = 'tel:' + cc.number;                 // opens the phone dialer
-  pendingUrl = url;                               // if the dialer did not open, the next tap does it
+  const cleanNumber = (cc.number || '').replace(/[^\d+]/g, '');
+  const url = 'tel:' + cleanNumber;
+  pendingUrl = url;
   setTimeout(() => { if (pendingUrl === url) pendingUrl = null; }, 20000);
-  speak(V[lang].calling + cc.name + V[lang].callTap);
+  let callingMsg = `Calling ${cc.name}...`;
+  if (lang.startsWith('te')) callingMsg = `${cc.name} కు కాల్ చేస్తున్నాను...`;
+  if (lang.startsWith('hi')) callingMsg = `${cc.name} को कॉल मिला रहा हूँ...`;
+  speak(callingMsg);
   window.location.href = url;
 }
 const contactBtnEl = document.getElementById('btnAddContact') || document.getElementById('contactBtn');
@@ -519,13 +594,57 @@ if (contactBtnEl) {
     speak(V[lang].saved + name);
   });
 }
+const btnImportContactsEl = document.getElementById('btnImportContacts');
+if (btnImportContactsEl) {
+  btnImportContactsEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    importPhoneContacts();
+  });
+}
 
 let pendingUrl = null;
 function doOpen(op) {
-  const w = window.open(op.url, '_blank');
   session = false;
+  const a = (op.app || op.name || '').toLowerCase();
+  
+  if (a.includes('camera') || a.includes('క్యామెరా') || a.includes('कैमरा')) {
+    describeCamera();
+    return;
+  }
+  if (a.includes('youtube') || a.includes('యూట్యూబ్') || a.includes('यूट्यूब')) {
+    window.open('https://m.youtube.com', '_blank');
+    speak(V[lang].opening + 'YouTube');
+    return;
+  }
+  if (a.includes('whatsapp') || a.includes('వాట్సాప్') || a.includes('व्हाट्सएप')) {
+    window.open('https://wa.me/', '_blank');
+    speak(V[lang].opening + 'WhatsApp');
+    return;
+  }
+  if (a.includes('messages') || a.includes('sms') || a.includes('సందేశం') || a.includes('మెసేజ్')) {
+    window.location.href = 'sms:';
+    speak(V[lang].opening + 'Messages');
+    return;
+  }
+  if (a.includes('phone') || a.includes('dialer') || a.includes('ఫోన్') || a.includes('फोन')) {
+    window.location.href = 'tel:';
+    speak(V[lang].opening + 'Phone');
+    return;
+  }
+
+  if (op.app) {
+    fetch('/api/open-app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app: op.app })
+    }).catch(() => {});
+    speak(V[lang].opening + op.name);
+    return;
+  }
+
+  const w = window.open(op.url, '_blank');
   if (w) { speak(V[lang].opening + op.name); }
-  else { pendingUrl = op.url; speak(V[lang].tapToOpen + op.name); }   // popup blocked: next tap opens it
+  else { pendingUrl = op.url; speak(V[lang].tapToOpen + op.name); }
 }
 
 // ================= voice lock (demo-grade speaker check) =================
@@ -1553,6 +1672,42 @@ function closePolicy() {
 if (policyBtn) policyBtn.addEventListener('click', (e) => { e.stopPropagation(); openPolicy(); });
 if (closePolicyBtn) closePolicyBtn.addEventListener('click', (e) => { e.stopPropagation(); closePolicy(); });
 if (okPolicyBtn) okPolicyBtn.addEventListener('click', (e) => { e.stopPropagation(); closePolicy(); startBackgroundKeepAlive(); });
+const btnAllowAllPermissionsEl = $('btnAllowAllPermissions');
+if (btnAllowAllPermissionsEl) {
+  btnAllowAllPermissionsEl.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    let micOk = false, geoOk = false;
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      micOk = true;
+    } catch(err) {
+      console.warn('Mic permission error:', err);
+    }
+    if ('geolocation' in navigator) {
+      await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          () => { geoOk = true; resolve(); },
+          () => { geoOk = false; resolve(); },
+          { timeout: 5000 }
+        );
+      });
+    }
+    await requestScreenWakeLock();
+    checkMicPermission();
+    startBackgroundKeepAlive();
+    
+    let msg = 'All permissions setup complete. ';
+    if (micOk && geoOk) {
+      msg += 'Microphone and location enabled. Swaram is ready!';
+    } else if (micOk) {
+      msg += 'Microphone enabled. Location was skipped.';
+    } else {
+      msg += 'Please click the lock icon in the address bar to allow microphone.';
+    }
+    closePolicy();
+    speak(msg);
+  });
+}
 if (reqMicBtn) reqMicBtn.addEventListener('click', async (e) => {
   e.stopPropagation();
   try {
@@ -1600,8 +1755,35 @@ if (readTeamBtn) readTeamBtn.addEventListener('click', (e) => {
   speak('Project Swaram. Designed and built by Kayala Durga Pavan Teja and engineering team. Swaram is an accessibility-first voice tutor built for over 40 million visually impaired citizens in India. Features sub-second voice AI, edge voice biometric lock, hands-free PDF notes study, and native support across 11 Indian languages.');
 });
 
-// Siri-style Background Keep-Alive Audio loop & WakeLock
+// Siri-style Background Keep-Alive Audio loop & Screen Wake Lock
 let keepAliveAudio = null;
+let screenWakeLock = null;
+
+async function requestScreenWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      screenWakeLock = await navigator.wakeLock.request('screen');
+      screenWakeLock.addEventListener('release', () => { screenWakeLock = null; });
+      return true;
+    } catch(err) {
+      console.warn('Wake Lock request:', err);
+      return false;
+    }
+  }
+  return false;
+}
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    await requestScreenWakeLock();
+    if (wakeWordMode && state === 'idle' && !currentAudio) {
+      setTimeout(() => {
+        if (wakeWordMode && state === 'idle' && !currentAudio) listen(true);
+      }, 300);
+    }
+  }
+});
+
 function startBackgroundKeepAlive() {
   try {
     if (!keepAliveAudio) {
@@ -1618,16 +1800,23 @@ function startBackgroundKeepAlive() {
       keepAliveAudio.resume();
     }
   } catch(e) {}
-  
-  if ('wakeLock' in navigator) {
-    navigator.wakeLock.request('screen').catch(() => {});
-  }
+  requestScreenWakeLock();
 }
 
-// ---------- speak with natural human neural voice ----------
+// ---------- speak with natural human neural voice & sentence pipelining ----------
 let currentAudio = null;
+let chatAbortCtrl = null;
+let audioQueue = [];
+let isPlayingQueue = false;
+
 function stopAudio() {
   speakId++;
+  audioQueue = [];
+  isPlayingQueue = false;
+  if (chatAbortCtrl) {
+    try { chatAbortCtrl.abort(); } catch(e) {}
+    chatAbortCtrl = null;
+  }
   speechSynthesis.cancel();
   if (currentAudio) {
     try {
@@ -1638,9 +1827,84 @@ function stopAudio() {
   }
 }
 
+function queueSentence(sentence, myId) {
+  if (myId !== speakId) return;
+  audioQueue.push({ sentence, myId });
+  if (!isPlayingQueue) {
+    playNextSentence();
+  }
+}
+
+function playNextSentence() {
+  if (audioQueue.length === 0) {
+    isPlayingQueue = false;
+    return;
+  }
+  isPlayingQueue = true;
+  const item = audioQueue.shift();
+  const sentence = item.sentence;
+  const myId = item.myId;
+  if (myId !== speakId) {
+    isPlayingQueue = false;
+    audioQueue = [];
+    return;
+  }
+
+  // Stop mic before audio playback
+  if (rec) { try { rec.abort(); } catch(e) {} }
+
+  textEl.textContent = sentence;
+  setState('speaking');
+
+  const onFinished = () => {
+    if (myId !== speakId) {
+      isPlayingQueue = false;
+      return;
+    }
+    if (audioQueue.length > 0) {
+      playNextSentence();
+    } else {
+      isPlayingQueue = false;
+      if (session) {
+        setTimeout(() => { if (session && myId === speakId && state !== 'speaking') listen(false); }, 400);
+      } else {
+        setState('idle');
+        if (wakeWordMode) {
+          setTimeout(() => { if (wakeWordMode && state === 'idle' && !currentAudio) listen(true); }, 400);
+        }
+      }
+    }
+  };
+
+  const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'instant');
+  if (engine === 'instant' || !navigator.onLine) {
+    fallbackBrowserSpeak(sentence, myId, onFinished);
+    return;
+  }
+
+  try {
+    const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&engine=${encodeURIComponent(engine)}&text=${encodeURIComponent(sentence)}`;
+    const audio = new Audio(audioUrl);
+    audio.playbackRate = speechRate;
+    currentAudio = audio;
+    audio.onplay = () => { if (myId === speakId) setState('speaking'); };
+    audio.onended = () => onFinished();
+    audio.onerror = () => fallbackBrowserSpeak(sentence, myId, onFinished);
+
+    const p = audio.play();
+    if (p !== undefined) {
+      p.catch(() => fallbackBrowserSpeak(sentence, myId, onFinished));
+    }
+  } catch (e) {
+    fallbackBrowserSpeak(sentence, myId, onFinished);
+  }
+}
+
 function speak(text) {
   speakId++;
   const myId = speakId;
+  audioQueue = [];
+  isPlayingQueue = false;
   lastSpokenText = text;
   speechSynthesis.cancel();
   if (currentAudio) {
@@ -1650,6 +1914,8 @@ function speak(text) {
     } catch(e) {}
     currentAudio = null;
   }
+  // Stop mic before audio plays
+  if (rec) { try { rec.abort(); } catch(e) {} }
   
   textEl.textContent = text;
   setState('speaking');
@@ -1663,46 +1929,35 @@ function speak(text) {
       currentAudio = null;
     }
     if (session) {
-      setTimeout(() => { if (session && myId === speakId) listen(false); }, 300);
+      setTimeout(() => { if (session && myId === speakId && state !== 'speaking') listen(false); }, 400);
     } else {
       setState('idle');
       if (wakeWordMode) {
-        setTimeout(() => { if (wakeWordMode && state === 'idle') listen(true); }, 400);
+        setTimeout(() => { if (wakeWordMode && state === 'idle' && !currentAudio) listen(true); }, 400);
       }
     }
   };
 
-  // Offline fallback - use browser speech immediately without network attempt
   if (!navigator.onLine) {
     fallbackBrowserSpeak(text, myId, done);
     return;
   }
 
   const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'instant');
-
-  // Instant Voice Engine (Browser Native Speech - 0.05s immediate playback, zero network delay)
   if (engine === 'instant') {
     fallbackBrowserSpeak(text, myId, done);
     return;
   }
 
-  // Network Audio Voice Engines (fast Google TTS ~0.8s, neural Edge-TTS ~1.8s)
   try {
     const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&engine=${encodeURIComponent(engine)}&text=${encodeURIComponent(text)}`;
     const audio = new Audio(audioUrl);
     audio.playbackRate = speechRate;
     currentAudio = audio;
     
-    audio.onplay = () => {
-      if (myId === speakId) setState('speaking');
-    };
-    audio.onended = () => {
-      done();
-    };
-    audio.onerror = (err) => {
-      console.warn('Neural audio failed, using browser speech synthesis', err);
-      fallbackBrowserSpeak(text, myId, done);
-    };
+    audio.onplay = () => { if (myId === speakId) setState('speaking'); };
+    audio.onended = () => done();
+    audio.onerror = (err) => fallbackBrowserSpeak(text, myId, done);
 
     try {
       if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') {
@@ -1712,13 +1967,9 @@ function speak(text) {
 
     const p = audio.play();
     if (p !== undefined) {
-      p.catch((err) => {
-        console.warn('audio.play() rejected:', err);
-        fallbackBrowserSpeak(text, myId, done);
-      });
+      p.catch((err) => fallbackBrowserSpeak(text, myId, done));
     }
   } catch (e) {
-    console.warn('speak() exception, falling back:', e);
     fallbackBrowserSpeak(text, myId, done);
   }
 }
@@ -1821,9 +2072,9 @@ function listen(wakeWait = false) {
       textEl.textContent = '“' + current + '”';
     }
 
-    // Fast end-of-speech auto-commit (triggers after 600ms pause instead of Chrome's 2s delay)
+    // Fast end-of-speech auto-commit (triggers after 800ms silence)
     if (silenceTimer) clearTimeout(silenceTimer);
-    if (!isWakeWaiting && state === 'listening' && current.length >= 3) {
+    if (!isWakeWaiting && state === 'listening' && current.length >= 2) {
       silenceTimer = setTimeout(() => {
         if (!got && state === 'listening') {
           const sentence = (finalHeard || interim).trim();
@@ -1831,11 +2082,11 @@ function listen(wakeWait = false) {
             got = true;
             finalHeard = '';
             const vec = finishCapture();
-            try { rec.stop(); } catch(err) {}
+            try { rec.abort(); } catch(err) {}
             handle(sentence, vec);
           }
         }
-      }, 600);
+      }, 800);
     }
 
     if (finalHeard.trim()) {
@@ -2180,32 +2431,208 @@ async function handle(text, vec) {
     const it = await aiIntent(text);
     if (it && runIntent(it)) return;
   }
-  setState('thinking'); beep(440, 120);
-  try {
-    const r = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Session-ID': sessionId
+  // Navigation Flow - Step 2: Destination Answer
+  if (awaitingDestination) {
+    awaitingDestination = false;
+    const destText = text.replace(/^(to|towards|take me to|go to|వెళ్ళాలి|వెళ్ళు|जाना है|ले चलो)\s*/i, '').trim();
+    if (destText.length >= 2) {
+      handleNavigation(destText);
+      return;
+    }
+  }
+
+  // Navigation Flow - Step 1: Open maps / navigation inquiry
+  const NAV_TRIGGER_RE = /^(open\s*)?(maps|navigation|navigate|google\s*maps)$|^(మ్యాప్స్|నావిగేషన్|దారి\s*చూపు|దారి)$|^(मैप्स|नेविगेशन|रास्ता\s*दिखाओ|नक्शा)$/i;
+  if (NAV_TRIGGER_RE.test(norm)) {
+    awaitingDestination = true;
+    session = true;
+    let askWhere = "Where do you want to go?";
+    if (lang.startsWith('te')) askWhere = "మీరు ఎక్కడికి వెళ్ళాలనుకుంటున్నారు?";
+    if (lang.startsWith('hi')) askWhere = "आप कहाँ जाना चाहते हैं?";
+    speak(askWhere);
+    return;
+  }
+
+  // Direct 1-step Navigation
+  const DIRECT_NAV_RE = /\b(directions?\s*to|navigate\s*to|route\s*to|take me to|go to)\s+(.+)\b|(.+)\s*(కి\s*దారి|కు\s*దారి|కి\s*రూట్)|(.+)\s*(का\s*रास्ता|के\s*लिए\s*दिशा)/i;
+  const dnm = text.match(DIRECT_NAV_RE);
+  if (dnm) {
+    const dTarget = (dnm[2] || dnm[3] || dnm[5] || '').trim();
+    if (dTarget && dTarget.length >= 2 && !dTarget.toLowerCase().includes('quiz') && !dTarget.toLowerCase().includes('story')) {
+      handleNavigation(dTarget);
+      return;
+    }
+  }
+
+  // High-Speed Streaming Chat with SSE & Audio Pipelining
+  await streamChatAI(cleanText);
+}
+
+let awaitingDestination = false;
+
+function handleNavigation(destText) {
+  setState('thinking');
+  textEl.textContent = 'Navigating to ' + destText + '...';
+  haptic(40);
+  beep(580, 50);
+
+  const fallbackOpen = () => {
+    const mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destText);
+    let msg = `Opening Google Maps navigation to ${destText}.`;
+    if (lang.startsWith('te')) msg = `గూగుల్ మ్యాప్స్‌లో ${destText} నావిగేషన్ తెరుస్తున్నాను.`;
+    if (lang.startsWith('hi')) msg = `गूगल मैप्स पर ${destText} का नेविगेशन खोल रहा हूँ।`;
+    speak(msg);
+    setTimeout(() => { window.open(mapsUrl, '_blank'); }, 2000);
+  };
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch('/api/directions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              origin_lat: pos.coords.latitude,
+              origin_lng: pos.coords.longitude,
+              destination_name: destText,
+              lang: lang
+            })
+          });
+          const d = await res.json();
+          if (d.ok && d.summary) {
+            speak(d.summary);
+            setTimeout(() => {
+              window.open(d.maps_url || ('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(destText)), '_blank');
+            }, 3500);
+          } else {
+            fallbackOpen();
+          }
+        } catch(e) {
+          fallbackOpen();
+        }
       },
-      body: JSON.stringify({ message: cleanText, lang, history })
-    });
-    const data = await r.json();
-    if (!r.ok || !data.reply) throw new Error(data.error || 'bad reply');
-    history.push({ role: 'user', text: cleanText }, { role: 'model', text: data.reply });
-    progressData.questionsAnswered = (progressData.questionsAnswered || 0) + 1;
-    updateProgressUI();
-    speak(data.reply);
-  } catch (e) {
-    console.error(e);
-    session = false;
-    speak(T[lang].err);
+      (err) => {
+        console.warn('Geolocation error:', err);
+        fallbackOpen();
+      },
+      { timeout: 7000 }
+    );
+  } else {
+    fallbackOpen();
   }
 }
 
-// ---------- tap anywhere ----------
+async function streamChatAI(cleanText) {
+  if (chatAbortCtrl) {
+    try { chatAbortCtrl.abort(); } catch(e) {}
+  }
+  chatAbortCtrl = new AbortController();
+  audioQueue = [];
+  isPlayingQueue = false;
+  speakId++;
+  const currentSpeakId = speakId;
+
+  haptic(40);
+  beep(580, 50);
+  setState('thinking');
+  if (rec) { try { rec.abort(); } catch(e) {} }
+
+  let fullReply = '';
+  try {
+    const response = await fetch('/api/chat-stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-ID': sessionId
+      },
+      body: JSON.stringify({ message: cleanText, lang, history }),
+      signal: chatAbortCtrl.signal
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error('Chat stream connection failed');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const dataStr = trimmed.slice(5).trim();
+        if (!dataStr) continue;
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.error) throw new Error(parsed.error);
+          if (parsed.done) {
+            if (parsed.full_reply) fullReply = parsed.full_reply;
+            break;
+          }
+          if (parsed.sentence && currentSpeakId === speakId) {
+            const s = parsed.sentence.trim();
+            if (s) {
+              fullReply += (fullReply ? ' ' : '') + s;
+              queueSentence(s, currentSpeakId);
+            }
+          }
+        } catch(jsonErr) {}
+      }
+    }
+
+    if (fullReply) {
+      history.push({ role: 'user', text: cleanText }, { role: 'model', text: fullReply });
+      progressData.questionsAnswered = (progressData.questionsAnswered || 0) + 1;
+      updateProgressUI();
+    } else if (!isPlayingQueue && audioQueue.length === 0) {
+      throw new Error('Empty response');
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.warn('Chat stream error, falling back to /api/chat:', err);
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-ID': sessionId },
+        body: JSON.stringify({ message: cleanText, lang, history })
+      });
+      const data = await r.json();
+      if (!r.ok || !data.reply) throw new Error(data.error || 'bad reply');
+      history.push({ role: 'user', text: cleanText }, { role: 'model', text: data.reply });
+      progressData.questionsAnswered = (progressData.questionsAnswered || 0) + 1;
+      updateProgressUI();
+      speak(data.reply);
+    } catch(fallbackErr) {
+      console.error('All chat attempts failed:', fallbackErr);
+      session = false;
+      const fallbackMsg = {
+        'te-IN': 'క్షమించండి, దయచేసి మళ్ళీ చెప్పండి.',
+        'hi-IN': 'माफ़ कीजिए, कृपया फिर से बोलें।',
+        'en-IN': 'Sorry, please say that again.'
+      }[lang] || 'Sorry, please say that again.';
+      speak(fallbackMsg);
+    }
+  }
+}
+
+// ---------- tap anywhere & instant barge-in ----------
 async function onTap() {
-  if (state === 'thinking') return;
+  if (state === 'speaking' || state === 'thinking') {
+    stopAudio();
+    session = true;
+    setTimeout(() => listen(false), 50);
+    return;
+  }
   if (pendingUrl) { 
     const u = pendingUrl; 
     pendingUrl = null; 
@@ -2217,6 +2644,7 @@ async function onTap() {
   if (state === 'idle') {
     session = true;
     startBackgroundKeepAlive();
+    requestScreenWakeLock();
     try {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -2234,10 +2662,6 @@ async function onTap() {
     finishCapture();
     setState('idle');
     textEl.textContent = 'Paused. Tap anywhere to speak.';
-  } else if (state === 'speaking') {       // interrupt and ask immediately like Alexa
-    session = true;
-    stopAudio();
-    listen();
   }
 }
 
