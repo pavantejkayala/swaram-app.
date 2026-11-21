@@ -175,6 +175,7 @@
     <button class="tool-chip" id="btnReadScreen">🔊 Read Screen</button>
     <button class="tool-chip" id="btnVoiceLock">🔒 Voice Lock: OFF</button>
     <button class="tool-chip" id="btnImportContacts" aria-label="Allow Contacts Permission to Call Anyone">👥 Allow Contacts to Call</button>
+    <button class="tool-chip" id="btnListContacts" aria-label="View Saved Phone Contacts">📖 View Contacts</button>
     <button class="tool-chip" id="btnAddContact">👤 Add Contact</button>
     <button class="tool-chip" id="btnPolicy">🛡️ Policy & Mic</button>
     <button class="tool-chip" id="btnAboutTeam">👥 Team & Story</button>
@@ -448,10 +449,32 @@ function parseLockCmd(t) { if (!LOCKW.test(t)) return null; return OFFW.test(t) 
 
 // ================= call contacts by voice =================
 // BEGIN-CALL
-const CALLV = /\b(call|dial|phone|ring)\b|కాల్|ఫోన్ చేయి|डायल|कॉल|फ़ोन कर|फोन कर/i;
+const CALLV = /\b(call|dial|phone|ring|make a call|place a call)\b|కాల్\s*(చేయి|చెయ్|చెయ్యి)?|ఫోన్\s*(చేయి|చెయ్|చెయ్యి)?|డయల్\s*(చేయి|చెయ్)?|कॉल\s*(करो|कीजिए|लगाओ|लगाएं)?|फ़ोन\s*(करो|कीजिए|लगाओ|लगाएं)?|फोन\s*(करो|कीजिए|लगाओ|लगाएं)?|डायल\s*(करो|कीजिए)?/i;
 const ADDV = /\b(save|add)\s+(a\s+)?(new\s+)?contact\b|కాంటాక్ట్\s*(యాడ్|సేవ్)|कॉन्टैक्ट\s*(जोड़|जोड|सेव|add)\S*|संपर्क\s*(जोड़|जोड|सेव)\S*/i;
-const LISTV = /\b(list|read|tell)\b.*\bcontacts?\b|\bmy contacts\b|కాంటాక్ట్స్|कॉन्टैक्ट्स|मेरे संपर्क/i;
+const LISTV = /\b(list|read|tell|view|show|see)\b.*\bcontacts?\b|\bmy contacts\b|కాంటాక్ట్స్|కాంటాక్ట్‌లు|కాంటాక్ట్ లిస్ట్|कॉन्टैक्ट्स|मेरे संपर्क|संपर्क सूची/i;
 const CONTACT_KEY = 'swaramContacts';
+
+const CONTACT_ALIASES = {
+  'Mom': ['mom', 'mother', 'amma', 'అమ్మ', 'మమ్మీ', 'माँ', 'मम्मी', 'माताजी', 'அம்மா', 'తల్లి'],
+  'Dad': ['dad', 'father', 'nanna', 'నాన్న', 'డాడీ', 'పాపా', 'पिताजी', 'बाबूजी', 'அப்பா', 'తండ్రి'],
+  'Doctor': ['doctor', 'doc', 'వైద్యుడు', 'డాక్టర్', 'डॉक्टर', 'हकीम'],
+  'Family': ['family', 'కుటుంబం', 'परिवार'],
+  'Home': ['home', 'house', 'ఇల్లు', 'घर'],
+  'Police': ['police', 'cop', 'పోలీస్', 'పోలీసులు', 'पुलिस', 'थाना'],
+  'Emergency': ['emergency', 'sos', 'help', 'అత్యవసరం', 'ఇమర్జెన్సీ', 'సహాయం', 'इमरजेंसी', 'आपातकालीन'],
+  'Ambulance': ['ambulance', 'అంబులెన్స్', 'ఆంబులెన్స్', 'एम्बुलेंस'],
+  'Fire': ['fire', 'అగ్నిమాపక', 'दमकल'],
+  'Women Helpline': ['women', 'mahila', 'మహిళా', 'महिला'],
+  'Childline': ['child', 'children', 'పిల్లల', 'बच्चों']
+};
+
+function cleanContactTarget(text) {
+  let s = text.replace(new RegExp(CALLV.source, 'gi'), ' ');
+  s = s.replace(/(కి|కు|గారికి|తో|నుండి|గారు)\b/gi, ' ');
+  s = s.replace(/\b(కో|के लिए|से|को|का|की)\b/gi, ' ');
+  s = s.replace(/\b(please|plz|the|a|to|for|my|contact|number)\b/gi, ' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
 const DEFAULT_CONTACTS = [
   { name: "Mom", number: "+919876543210" },
   { name: "Dad", number: "+919876543211" },
@@ -506,11 +529,10 @@ function phoneFrom(text) {
   return null;
 }
 function parseCall(text) {
-  const t = text.trim(), tl = t.toLowerCase();
+  const t = text.trim();
   if (ADDV.test(t)) {
     const num = phoneFrom(t);
-    const name = t.replace(new RegExp(ADDV.source, 'gi'), ' ').replace(/[\d\s\-+]*\d[\d\s\-+]*/g, ' ')
-      .replace(/\b(name|number|is|as|with|named|the)\b|పేరు|నంబర్|नाम|नंबर/gi, ' ').replace(/\s+/g, ' ').trim();
+    const name = cleanContactTarget(t).replace(/[\d\s\-+]*\d[\d\s\-+]*/g, ' ').trim();
     if (!num || !name) return { type: 'addfail' };
     return { type: 'add', name, number: num };
   }
@@ -518,18 +540,33 @@ function parseCall(text) {
   if (!CALLV.test(t)) return null;
 
   const contacts = loadContacts();
-  const cleanTarget = t.replace(new RegExp(CALLV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
+  const cleanTarget = cleanContactTarget(t);
   const cleanTargetL = cleanTarget.toLowerCase();
+  const tl = t.toLowerCase();
 
-  const hit = contacts.find(c => {
+  // 1. Direct phone number spoken (e.g. "Call 9876543210" or "Call 100")
+  const num = phoneFrom(cleanTarget) || phoneFrom(t);
+  if (num && num.length >= 3) {
+    const hitNum = contacts.find(c => c.number.replace(/\D/g, '') === num.replace(/\D/g, ''));
+    return { type: 'call', name: hitNum ? hitNum.name : num, number: num };
+  }
+
+  // 2. Exact or alias match across contacts
+  for (const c of contacts) {
     const cn = c.name.toLowerCase();
-    return tl.includes(cn) || (cleanTargetL && (cleanTargetL.includes(cn) || cn.includes(cleanTargetL)));
-  });
-  if (hit) return { type: 'call', name: hit.name, number: hit.number };
+    if (cn === cleanTargetL || tl.includes(cn) || (cleanTargetL && (cleanTargetL.includes(cn) || cn.includes(cleanTargetL)))) {
+      return { type: 'call', name: c.name, number: c.number };
+    }
+    const aliases = CONTACT_ALIASES[c.name] || c.aliases || [];
+    for (const a of aliases) {
+      const al = a.toLowerCase();
+      if (al === cleanTargetL || tl.includes(al) || (cleanTargetL && (cleanTargetL.includes(al) || al.includes(cleanTargetL)))) {
+        return { type: 'call', name: c.name, number: c.number };
+      }
+    }
+  }
 
-  const num = phoneFrom(t);
-  if (num) return { type: 'call', name: num, number: num };
-
+  // 3. User requested a call but person is not in contacts
   if (cleanTarget && cleanTarget.split(' ').length <= 4) {
     return { type: 'nocontact', name: cleanTarget };
   }
@@ -622,24 +659,179 @@ function addContact(name, number) {
   list.push({ name, number });
   saveContacts(list);
 }
-function showCallBanner(name, number, url) {
-  let banner = $('callBanner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = 'callBanner';
-    banner.setAttribute('role', 'alert');
-    banner.style.cssText = 'position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:10000; background:#00e676; color:#000; padding:12px 22px; border-radius:30px; font-weight:bold; font-size:1.05rem; box-shadow:0 6px 24px rgba(0,230,118,0.5); display:flex; align-items:center; gap:12px; cursor:pointer; text-align:center; max-width:92vw;';
-    banner.onclick = (e) => {
+function triggerDialer(url) {
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.rel = 'noopener';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => link.remove(), 1000);
+  } catch(e) {}
+  try {
+    window.location.href = url;
+  } catch(e) {}
+}
+
+function showCallActionModal(name, number, url) {
+  let modal = $('callActionModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'callActionModal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;';
+    modal.innerHTML = `
+      <div style="background:#161616; border:3px solid #00e676; border-radius:22px; max-width:380px; width:100%; padding:26px 20px; text-align:center; box-shadow:0 0 40px rgba(0,230,118,0.45);">
+        <div style="font-size:3.5rem; margin-bottom:8px; line-height:1;">📞</div>
+        <div style="font-size:1.4rem; font-weight:800; color:#fff; margin-bottom:4px;" id="callActionName">Calling</div>
+        <div style="font-size:1.15rem; color:#00e676; font-weight:700; margin-bottom:20px;" id="callActionNumber"></div>
+        <a id="callActionDialBtn" href="${url}" style="display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:16px; background:#00e676; color:#000; font-size:1.25rem; font-weight:800; border-radius:14px; text-decoration:none; margin-bottom:12px; box-shadow:0 4px 18px rgba(0,230,118,0.5);">
+          <span>🟢 Open Phone Dialer</span>
+        </a>
+        <button id="callActionCloseBtn" style="width:100%; padding:12px; background:#222; color:#ccc; border:1px solid #444; border-radius:12px; font-weight:600; cursor:pointer;">
+          Cancel Call
+        </button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    $('callActionCloseBtn').onclick = (e) => {
       e.stopPropagation();
-      window.location.href = url;
+      modal.style.display = 'none';
+      pendingUrl = null;
     };
-    document.body.appendChild(banner);
+    $('callActionDialBtn').onclick = () => {
+      pendingUrl = null;
+      setTimeout(() => { if (modal) modal.style.display = 'none'; }, 600);
+    };
   }
-  banner.innerHTML = `📞 Calling <strong>${name}</strong> (${number}) &bull; <span style="text-decoration:underline;">Tap to connect</span>`;
-  banner.style.display = 'flex';
+  $('callActionName').textContent = 'Calling ' + name;
+  $('callActionNumber').textContent = number;
+  $('callActionDialBtn').href = url;
+  modal.style.display = 'flex';
   setTimeout(() => {
-    if (banner) banner.style.display = 'none';
-  }, 15000);
+    if (modal && modal.style.display === 'flex') modal.style.display = 'none';
+  }, 25000);
+}
+
+function showContactNotFoundModal(targetName) {
+  let modal = $('contactNotFoundModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'contactNotFoundModal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.88); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;';
+    document.body.appendChild(modal);
+  }
+  const cleanName = (targetName || '').trim() || 'Contact';
+  modal.innerHTML = `
+    <div style="background:#161616; border:2px solid #ffd400; border-radius:20px; max-width:400px; width:100%; padding:22px; text-align:center; color:#fff; box-shadow:0 0 30px rgba(255,212,0,0.3);">
+      <div style="font-size:3rem; margin-bottom:8px;">🔍</div>
+      <h3 style="margin:0 0 8px; font-size:1.3rem; color:#ffd400;">Contact Not Found</h3>
+      <p style="color:#ccc; font-size:0.95rem; margin:0 0 16px;">
+        "<strong>${cleanName}</strong>" is not in your saved contacts list.
+      </p>
+      <button id="cnfPickBtn" style="width:100%; padding:14px; background:#00e676; color:#000; font-size:1.05rem; font-weight:800; border:none; border-radius:12px; margin-bottom:14px; cursor:pointer; box-shadow:0 4px 14px rgba(0,230,118,0.4);">
+        📱 Select "${cleanName}" from Phone
+      </button>
+      <div style="background:#222; border-radius:12px; padding:12px; margin-bottom:14px; text-align:left;">
+        <label style="font-size:0.85rem; color:#aaa; display:block; margin-bottom:6px;">Or Enter Phone Number to Call:</label>
+        <div style="display:flex; gap:8px;">
+          <input id="cnfNumInput" type="tel" placeholder="10-digit number" style="flex:1; padding:10px 12px; background:#111; border:1px solid #444; border-radius:8px; color:#fff; font-size:1rem;" />
+          <button id="cnfCallBtn" style="padding:10px 14px; background:#00e676; color:#000; font-weight:800; border:none; border-radius:8px; cursor:pointer;">
+            📞 Call
+          </button>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button id="cnfViewAllBtn" style="flex:1; padding:10px; background:#333; color:#fff; border:none; border-radius:8px; font-weight:600; cursor:pointer;">
+          📖 View Contacts
+        </button>
+        <button id="cnfCloseBtn" style="padding:10px 16px; background:#222; color:#bbb; border:1px solid #444; border-radius:8px; cursor:pointer;">
+          Close
+        </button>
+      </div>
+    </div>
+  `;
+  modal.style.display = 'flex';
+
+  $('cnfPickBtn').onclick = () => {
+    modal.style.display = 'none';
+    importPhoneContacts(cleanName);
+  };
+  $('cnfCallBtn').onclick = () => {
+    const rawNum = ($('cnfNumInput').value || '').trim();
+    const p = phoneFrom(rawNum) || rawNum.replace(/[^\d+]/g, '');
+    if (!p || p.length < 3) {
+      alert('Please enter a valid phone number');
+      return;
+    }
+    addContact(cleanName, p);
+    modal.style.display = 'none';
+    doContact({ type: 'call', name: cleanName, number: p });
+  };
+  $('cnfViewAllBtn').onclick = () => {
+    modal.style.display = 'none';
+    showContactsListModal();
+  };
+  $('cnfCloseBtn').onclick = () => {
+    modal.style.display = 'none';
+  };
+}
+
+function showContactsListModal() {
+  const contacts = loadContacts();
+  let modal = $('contactsListModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'contactsListModal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(0,0,0,0.88); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;';
+    document.body.appendChild(modal);
+  }
+  let html = `
+    <div style="background:#141414; border:2px solid #00e676; border-radius:20px; max-width:440px; width:100%; max-height:85vh; display:flex; flex-direction:column; padding:20px; color:#fff;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #333; padding-bottom:10px;">
+        <h3 style="margin:0; font-size:1.25rem; color:#00e676;">👥 Phone Contacts (${contacts.length})</h3>
+        <button id="closeContactsListBtn" style="background:none; border:none; color:#fff; font-size:1.8rem; cursor:pointer;" aria-label="Close">&times;</button>
+      </div>
+      <div style="flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-bottom:14px; display:flex; flex-direction:column; gap:8px;">
+  `;
+  for (const c of contacts) {
+    const cleanNum = (c.number || '').replace(/[^\d+]/g, '');
+    html += `
+      <div style="background:#202020; border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:bold; font-size:1.05rem;">${c.name}</div>
+          <div style="color:#aaa; font-size:0.85rem;">${cleanNum}</div>
+        </div>
+        <a href="tel:${cleanNum}" style="background:#00e676; color:#000; padding:8px 14px; border-radius:8px; font-weight:bold; text-decoration:none; font-size:0.95rem;">
+          📞 Call
+        </a>
+      </div>
+    `;
+  }
+  html += `
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button id="modalImportBtn" style="flex:1; padding:12px; background:#00e676; color:#000; font-weight:bold; border:none; border-radius:10px; cursor:pointer;">
+          📲 Allow & Import Contacts
+        </button>
+        <button id="modalDoneBtn" style="padding:12px 20px; background:#333; color:#fff; font-weight:bold; border:none; border-radius:10px; cursor:pointer;">
+          Done
+        </button>
+      </div>
+    </div>
+  `;
+  modal.innerHTML = html;
+  modal.style.display = 'flex';
+  $('closeContactsListBtn').onclick = () => { modal.style.display = 'none'; };
+  $('modalDoneBtn').onclick = () => { modal.style.display = 'none'; };
+  $('modalImportBtn').onclick = () => { modal.style.display = 'none'; importPhoneContacts(); };
+  speak(contacts.length ? `You have ${contacts.length} saved contacts. Tap call next to any name.` : 'No contacts saved yet.');
 }
 
 async function importPhoneContacts(prefillName = '') {
@@ -700,30 +892,33 @@ function doContact(cc) {
   if (cc.type === 'addfail') { session = true; speak(V[lang].addFail); return; }
   if (cc.type === 'nocontact') {
     session = false;
-    let notFoundMsg = `Contact ${cc.name || ''} not found. Opening Contacts to allow and select them.`;
-    if (lang.startsWith('te')) notFoundMsg = `${cc.name || 'కాంటాక్ట్'} కనబడలేదు. ఎంచుకోవడానికి కాంటాక్ట్‌లను తెరుస్తున్నాను.`;
-    if (lang.startsWith('hi')) notFoundMsg = `${cc.name || 'संपर्क'} नहीं मिला। चुनने के लिए संपर्क खोल रहा हूँ।`;
+    let notFoundMsg = `I couldn't find ${cc.name || 'that contact'}. Tap green button to pick them from your phone or enter their number.`;
+    if (lang.startsWith('te')) notFoundMsg = `${cc.name || 'కాంటాక్ట్'} కనబడలేదు. మీ ఫోన్ నుండి ఎంచుకోవడానికి ఆకుపచ్చ బటన్ నొక్కండి.`;
+    if (lang.startsWith('hi')) notFoundMsg = `${cc.name || 'संपर्क'} नहीं मिला। फोन से चुनने के लिए हरा बटन दबाएं।`;
     speak(notFoundMsg);
-    setTimeout(() => {
-      importPhoneContacts(cc.name);
-    }, 1200);
+    showContactNotFoundModal(cc.name);
     return;
   }
   if (cc.type === 'list') {
-    const l = loadContacts();
-    speak(l.length ? V[lang].contactsAre + l.map(c => c.name).join(', ') : V[lang].noContacts);
+    showContactsListModal();
     return;
   }
   const cleanNumber = (cc.number || '').replace(/[^\d+]/g, '');
   const url = 'tel:' + cleanNumber;
   pendingUrl = url;
-  setTimeout(() => { if (pendingUrl === url) pendingUrl = null; }, 20000);
-  showCallBanner(cc.name, cleanNumber, url);
-  let callingMsg = `Calling ${cc.name}...`;
-  if (lang.startsWith('te')) callingMsg = `${cc.name} కు కాల్ చేస్తున్నాను...`;
-  if (lang.startsWith('hi')) callingMsg = `${cc.name} को कॉल मिला रहा हूँ...`;
+  setTimeout(() => { if (pendingUrl === url) pendingUrl = null; }, 25000);
+
+  // 1. Show the dedicated full-screen call action card with native <a> tag
+  showCallActionModal(cc.name, cleanNumber, url);
+
+  // 2. Trigger programmatic dialer navigation
+  triggerDialer(url);
+
+  // 3. Announce spoken confirmation
+  let callingMsg = `Calling ${cc.name}. Tap green button to open phone dialer.`;
+  if (lang.startsWith('te')) callingMsg = `${cc.name} కు కాల్ చేస్తున్నాను. డయలర్ తెరవడానికి ఆకుపచ్చ బటన్ నొక్కండి.`;
+  if (lang.startsWith('hi')) callingMsg = `${cc.name} को कॉल कर रहे हैं। डायलर खोलने के लिए हरा बटन दबाएं।`;
   speak(callingMsg);
-  window.location.href = url;
 }
 const contactBtnEl = document.getElementById('btnAddContact') || document.getElementById('contactBtn');
 if (contactBtnEl) {
@@ -743,6 +938,13 @@ if (btnImportContactsEl) {
   btnImportContactsEl.addEventListener('click', (e) => {
     e.stopPropagation();
     importPhoneContacts();
+  });
+}
+const btnListContactsEl = document.getElementById('btnListContacts');
+if (btnListContactsEl) {
+  btnListContactsEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showContactsListModal();
   });
 }
 
@@ -1828,35 +2030,38 @@ const btnAllowAllPermissionsEl = $('btnAllowAllPermissions');
 if (btnAllowAllPermissionsEl) {
   btnAllowAllPermissionsEl.addEventListener('click', async (e) => {
     e.stopPropagation();
-    let micOk = false, geoOk = false, contactsOk = false;
+    // 1. If Contact Picker is supported, prompt for contacts first while user gesture is 100% active
+    if ('contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        await importPhoneContacts();
+      } catch(err) {
+        console.warn('Contacts permission skipped:', err);
+      }
+    }
+    // 2. Microphone permission
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      micOk = true;
     } catch(err) {
       console.warn('Mic permission error:', err);
     }
+    // 3. Geolocation permission
     if ('geolocation' in navigator) {
       await new Promise((resolve) => {
         navigator.geolocation.getCurrentPosition(
-          () => { geoOk = true; resolve(); },
-          () => { geoOk = false; resolve(); },
+          () => resolve(),
+          () => resolve(),
           { timeout: 4000 }
         );
       });
     }
+    // 4. Screen wake lock
     await requestScreenWakeLock();
-    if ('contacts' in navigator && 'ContactsManager' in window) {
-      try {
-        contactsOk = await importPhoneContacts();
-      } catch(e) {}
-    }
     checkMicPermission();
     startBackgroundKeepAlive();
-    
+    closePolicy();
     let msg = 'All permissions granted for Microphone, Contacts, and Location. Swaram is ready to call anyone by voice.';
     if (lang.startsWith('te')) msg = 'మైక్రోఫోన్, కాంటాక్ట్స్ మరియు లొకేషన్ అనుమతులు ఇవ్వబడ్డాయి. స్వరం కాల్ చేయడానికి సిద్ధంగా ఉంది.';
     if (lang.startsWith('hi')) msg = 'माइक्रोफोन, संपर्क और लोकेशन की अनुमति मिल गई है। स्वरम कॉल करने के लिए तैयार है।';
-    closePolicy();
     speak(msg);
   });
 }
