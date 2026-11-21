@@ -260,13 +260,12 @@ def gen_config(**extra):
     cfg = {
         "temperature": 0.3,
         "maxOutputTokens": 60,
-        "thinkingConfig": {"thinkingBudget": THINKING_BUDGET},
     }
     cfg.update(extra)
     return cfg
 
 
-def call_gemini(body, timeout=7):
+def call_gemini(body, timeout=12):
     models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
     # remove duplicates while preserving order
     models_to_try = list(dict.fromkeys(models_to_try))
