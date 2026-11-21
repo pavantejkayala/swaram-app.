@@ -104,6 +104,44 @@ class TestSwaramEndpoints(unittest.TestCase):
             self.assertNotIn("*", desc)
             print(f"  [PASS] Vision API verified: '{desc[:50]}...'")
 
+    def test_07_directions(self):
+        """Verify interactive GPS directions and compass bearing navigation."""
+        payload = json.dumps({
+            "origin_lat": 17.3850,
+            "origin_lng": 78.4867,
+            "destination_name": "Charminar",
+            "lang": "en-IN"
+        }).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/api/directions",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            self.assertEqual(resp.status, 200)
+            data = json.loads(resp.read().decode())
+            self.assertTrue(data.get("ok"))
+            self.assertTrue(data.get("distance_km", 0) > 0)
+            self.assertIn("maps_url", data)
+            summary = data.get("summary", "")
+            self.assertIn("Charminar", summary)
+            print(f"  [PASS] Directions verified: '{summary}'")
+
+    def test_08_chat_stream(self):
+        """Verify ultra-low latency SSE sentence streaming chat endpoint."""
+        payload = json.dumps({"message": "Hello Swaram, how are you?", "lang": "en-IN"}).encode()
+        req = urllib.request.Request(
+            f"{BASE_URL}/api/chat-stream",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            self.assertEqual(resp.status, 200)
+            stream_content = resp.read().decode()
+            self.assertIn("data:", stream_content)
+            self.assertIn('"done": true', stream_content)
+            print("  [PASS] SSE chat stream verified: received streaming sentence events.")
+
 
 if __name__ == "__main__":
     print("=" * 65)
