@@ -2,7 +2,9 @@ import os
 import subprocess
 import sys
 
-os.environ["GEMINI_API_KEY"] = "AQ.Ab8RN6IkNEV4z43r9RKBPUIQ0IBJA_fyAuxxe1Rg3_nv2QhiIA"
+# Set your Gemini API key here or via environment variable
+os.environ.setdefault("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
+os.environ["GEMINI_MODEL"] = "gemini-3.1-flash-lite"
 os.environ["PORT"] = "5050"
 os.environ["HOST"] = "::"
 
