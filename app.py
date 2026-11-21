@@ -46,6 +46,7 @@ INTENTS = {
 
 UI_CACHE = {}
 TTS_CACHE = {}
+CHAT_CACHE = {}
 HTTP_SESSION = requests.Session()
 HTTP_SESSION.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -239,9 +240,9 @@ NEURAL_VOICES = {
 def build_system_prompt(lang_code: str) -> str:
     lang = LANG_NAMES.get(lang_code, "English")
     return (
-        f"You are Swaram, a lightning-fast, intelligent voice AI companion like Siri. "
+        f"You are Swaram, a lightning-fast voice AI assistant like Siri. "
         f"Reply in {lang}. Spoken text only: strictly no markdown, no asterisks, no bullets, no emojis. "
-        "Be direct, warm, and concise: answer in 1 or 2 natural spoken sentences (under 30 words). "
+        "Be direct, warm, and concise: answer immediately in 1 short spoken sentence (under 20 words). "
         "Never use lists, preambles, or filler. Give the direct answer immediately. "
         "Native script: Telugu script for Telugu, Devanagari for Hindi/Marathi, Tamil script for Tamil, English for English."
     )
@@ -256,12 +257,16 @@ def clean_for_speech(text: str) -> str:
 
 
 def gen_config(**extra):
-    cfg = {"temperature": 0.6, "maxOutputTokens": 90}
+    cfg = {
+        "temperature": 0.3,
+        "maxOutputTokens": 60,
+        "thinkingConfig": {"thinkingBudget": THINKING_BUDGET},
+    }
     cfg.update(extra)
     return cfg
 
 
-def call_gemini(body, timeout=20):
+def call_gemini(body, timeout=7):
     models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
     # remove duplicates while preserving order
     models_to_try = list(dict.fromkeys(models_to_try))
@@ -569,6 +574,12 @@ def chat():
 
     session_id = request.headers.get("X-Session-ID", "default")
     doc = db_get_doc(session_id)
+
+    # Fast in-memory cache for common search queries without uploaded PDF notes
+    cache_key = f"{lang}:{message.lower()}" if not doc and not history else None
+    if cache_key and cache_key in CHAT_CACHE:
+        return jsonify(reply=CHAT_CACHE[cache_key])
+
     doc_prompt = ""
     if doc:
         doc_prompt = (
@@ -599,6 +610,8 @@ def chat():
         reply = clean_for_speech(call_gemini(body))
         if not reply:
             raise ValueError("empty reply")
+        if cache_key and len(CHAT_CACHE) < 1000:
+            CHAT_CACHE[cache_key] = reply
         return jsonify(reply=reply)
     except Exception as exc:
         app.logger.error("Gemini error: %s", exc)
