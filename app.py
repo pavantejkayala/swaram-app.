@@ -43,7 +43,7 @@ app = Flask(__name__, static_folder="static", static_url_path="")
 
 DEFAULT_GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or DEFAULT_GEMINI_KEY
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent"
@@ -312,15 +312,15 @@ def bearing_to_compass(bearing: float, lang: str = "en-IN") -> str:
 
 def gen_config(**extra):
     cfg = {
-        "temperature": 0.3,
-        "maxOutputTokens": 150,
+        "temperature": 0.2,
+        "maxOutputTokens": 80,
     }
     cfg.update(extra)
     return cfg
 
 
 def call_gemini(body, timeout=12):
-    models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+    models_to_try = [GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     # remove duplicates while preserving order
     models_to_try = list(dict.fromkeys(models_to_try))
     last_err = None
@@ -714,7 +714,7 @@ def chat_stream():
     }
 
     def generate():
-        models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+        models_to_try = [GEMINI_MODEL, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
         models_to_try = list(dict.fromkeys(models_to_try))
 
         stream_resp = None
@@ -786,7 +786,13 @@ def chat_stream():
         full_reply = " ".join(full_text_accum).strip()
         yield f"data: {json.dumps({'done': True, 'full_text': full_reply}, ensure_ascii=False)}\n\n"
 
-    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+    headers = {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive"
+    }
+    return Response(stream_with_context(generate()), headers=headers, mimetype="text/event-stream")
 
 
 @app.post("/api/directions")
