@@ -239,14 +239,30 @@ NEURAL_VOICES = {
 }
 
 
+SCRIPT_MAP = {
+    "te-IN": "Telugu script (తెలుగు)",
+    "hi-IN": "Devanagari script (हिन्दी)",
+    "en-IN": "English (Latin script)",
+    "ta-IN": "Tamil script (தமிழ்)",
+    "kn-IN": "Kannada script (ಕನ್ನಡ)",
+    "ml-IN": "Malayalam script (മലയാളം)",
+    "mr-IN": "Devanagari script (मराठी)",
+    "bn-IN": "Bengali script (বাংলা)",
+    "gu-IN": "Gujarati script (ગુજરાતી)",
+    "pa-IN": "Gurmukhi script (ਪੰਜਾਬੀ)",
+    "ur-IN": "Urdu script (اردو)",
+}
+
+
 def build_system_prompt(lang_code: str) -> str:
     lang = LANG_NAMES.get(lang_code, "English")
+    script = SCRIPT_MAP.get(lang_code, "native script")
     return (
-        f"You are Swaram, a lightning-fast voice AI assistant like Siri. "
-        f"Reply in {lang}. Spoken text only: strictly no markdown, no asterisks, no bullets, no emojis. "
-        "Be direct, warm, and concise: answer immediately in 1 to 2 short, natural spoken sentences. "
-        "No markdown, no bullet points, no filler. "
-        "Native script: Telugu script for Telugu, Devanagari for Hindi/Marathi, Tamil script for Tamil, English for English."
+        f"You are Swaram, an audio companion for visually impaired learners. "
+        f"Reply in {lang} using {script}. "
+        "Spoken text only: no markdown, no bullet points, no asterisks, no emojis. "
+        "Keep answers short, warm, and clear: 1 or 2 plain conversational sentences. "
+        "Always write in the native script of the language, never in Romanized English transliteration."
     )
 
 
@@ -266,24 +282,25 @@ def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> flo
     return (math.degrees(math.atan2(y, x)) + 360) % 360
 
 
+COMPASS_DIRS = {
+    "en-IN": ["North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West"],
+    "te-IN": ["ఉత్తరం", "ఉత్తర-తూర్పు", "తూర్పు", "దక్షిణ-తూర్పు", "దక్షిణం", "దక్షిణ-పశ్చిమం", "పశ్చిమం", "ఉత్తర-పశ్చిమం"],
+    "hi-IN": ["उत्तर", "उत्तर-पूर्व", "पूर्व", "दक्षिण-पूर्व", "दक्षिण", "दक्षिण-पश्चिम", "पश्चिम", "उत्तर-पश्चिम"],
+    "ta-IN": ["வடக்கு", "வடகிழக்கு", "கிழக்கு", "தென்கிழக்கு", "தெற்கு", "தென்மேற்கு", "மேற்கு", "வடமேற்கு"],
+    "kn-IN": ["ಉತ್ತರ", "ಈಶಾನ್ಯ", "ಪೂರ್ವ", "ಆಗ್ನೇಯ", "ದಕ್ಷಿಣ", "ನೈಋತ್ಯ", "ಪಶ್ಚಿಮ", "ವಾಯವ್ಯ"],
+    "ml-IN": ["വടക്ക്", "വടക്കുകിഴക്ക്", "കിഴക്ക്", "തെക്കുകിഴക്ക്", "തെക്ക്", "തെക്കുപടിഞ്ഞാറ്", "പടിഞ്ഞാറ്", "വടക്കുപടിഞ്ഞാറ്"],
+    "mr-IN": ["उत्तर", "ईशान्य", "पूर्व", "आग्नेय", "दक्षिण", "नैऋत्य", "पश्चिम", "वायव्य"],
+    "bn-IN": ["উত্তর", "উত্তর-পূর্ব", "পূর্ব", "দক্ষিণ-পূর্ব", "दक्षिण", "দক্ষিণ-পশ্চিম", "পশ্চিম", "উত্তর-পশ্চিম"],
+    "gu-IN": ["ઉત્તર", "ઉત્તર-પૂર્વ", "પૂર્વ", "દક્ષિણ-પૂર્વ", "દક્ષિણ", "દક્ષિણ-પશ્ચિમ", "પશ્ચિમ", "ઉત્તર-પશ્ચિમ"],
+    "pa-IN": ["ਉੱਤਰ", "ਉੱਤਰ-ਪੂਰਬ", "ਪੂਰਬ", "ਦੱਖਣ-ਪੂਰਬ", "ਦੱਖਣ", "ਦੱਖਣ-ਪੱਛਮ", "ਪੱਛਮ", "ਉੱਤਰ-ਪੱਛਮ"],
+    "ur-IN": ["شمال", "شمال مشرق", "مشرق", "جنوب مشرق", "جنوب", "جنوب مغرب", "مغرب", "شمال مغرب"],
+}
+
+
 def bearing_to_compass(bearing: float, lang: str = "en-IN") -> str:
-    directions = [
-        ("North", "ఉత్తరం", "उत्तर"),
-        ("North-East", "ఉత్తర-తూర్పు", "उत्तर-पूर्व"),
-        ("East", "తూర్పు", "पूर्व"),
-        ("South-East", "దక్షిణ-తూర్పు", "दक्षिण-पूर्व"),
-        ("South", "దక్షిణం", "दक्षिण"),
-        ("South-West", "దక్షిణ-పశ్చిమం", "दक्षिण-पश्चिम"),
-        ("West", "పశ్చిమం", "पश्चिम"),
-        ("North-West", "ఉత్తర-పశ్చిమం", "उत्तर-पश्चिम"),
-    ]
     idx = round(bearing / 45) % 8
-    en, te, hi = directions[idx]
-    if lang.startswith("te"):
-        return te
-    elif lang.startswith("hi"):
-        return hi
-    return en
+    dirs = COMPASS_DIRS.get(lang) or COMPASS_DIRS["en-IN"]
+    return dirs[idx]
 
 
 def gen_config(**extra):
@@ -916,11 +933,10 @@ def vision_describe():
         prompt = (
             f"You are Swaram's assistive camera eye for a blind or visually impaired person. "
             f"Analyze this image and describe it clearly in spoken {lang_name}. "
-            "Prioritize in this order: "
-            "1. If Indian currency notes or coins (rupees) are visible, identify the exact denomination clearly (e.g. 500 rupees note, 100 rupees note). "
-            "2. If a medicine bottle, food pack, or document with printed text is visible, read the prominent name, dosage, or title text aloud. "
-            "3. Otherwise, describe key objects, people, or obstacles directly in front. "
-            f"Strict rules: Reply in spoken {lang_name} under 45 words. Strictly plain speech: NO markdown, NO asterisks, NO bullets, NO emojis."
+            "If Indian currency notes or coins are visible, mention the amount. "
+            "If medicine labels or text are visible, read the brand or name. "
+            "Otherwise, describe the main objects or path ahead. "
+            f"Reply in spoken {lang_name} in native script under 40 words. Plain conversational speech only, no markdown or bullets."
         )
 
     body = {
