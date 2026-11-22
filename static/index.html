@@ -189,7 +189,7 @@
   <video id="cameraVideo" playsinline autoplay muted style="display:none" aria-hidden="true"></video>
   <canvas id="cameraCanvas" style="display:none" aria-hidden="true"></canvas>
   
-  <!-- Human Team & Engineering Story Modal (Hackathon Human Verification) -->
+  <!-- Project Overview and Team Modal -->
   <div id="teamModal" role="dialog" aria-modal="true" aria-hidden="true" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:16px;">
     <div style="background:#141414; border:2px solid #ffd400; border-radius:18px; max-width:620px; width:100%; padding:24px; max-height:85vh; overflow-y:auto; color:#fff; text-align:left;">
       <h2 style="color:#ffd400; margin-top:0; display:flex; justify-content:space-between; align-items:center; font-size:1.4rem;">
@@ -207,11 +207,11 @@
       </p>
       <h3 style="color:#ffd400; margin:14px 0 6px; font-size:1.1rem;">🛠️ Key Engineering Innovations</h3>
       <ul style="line-height:1.6; color:#ccc; font-size:0.88rem; padding-left:20px;">
-        <li><strong>Sub-Second Hybrid Voice Pipeline:</strong> Custom 800ms silence debouncing paired with in-browser native speech synthesis and SSE sentence pipelining, achieving ~300ms end-to-end response time.</li>
-        <li><strong>Privacy-Preserving Edge Biometrics:</strong> 100% client-side Web Audio API MFCC voiceprint lock ensures biometric voiceprints never leave the learner's device.</li>
-        <li><strong>Great-Circle Spatial Navigation:</strong> Pure trigonometric forward azimuth and Haversine math with OSRM routing step parsing and 8-point compass navigation.</li>
-        <li><strong>Accessible PDF Study Coach:</strong> Real-time text chunking from university textbooks with audio question-and-answer.</li>
-        <li><strong>WCAG 2.1 AAA Compliance:</strong> Designed from scratch with 48px tactile touch targets, dual-tone earcons, and zero screen reliance.</li>
+        <li><strong>Fast Voice Processing:</strong> 800ms silence debouncing paired with streaming audio synthesis for quick feedback.</li>
+        <li><strong>On-Device Voice Lock:</strong> Web Audio API audio spectrum analysis keeps speaker verification on your phone without sending voice data away.</li>
+        <li><strong>Compass Navigation:</strong> Bearing calculation and distance estimates with 8-point compass directions.</li>
+        <li><strong>PDF Study Coach:</strong> Reads uploaded chapter notes and answers spoken questions.</li>
+        <li><strong>Accessibility Focus:</strong> High-contrast touch targets, vibration alerts, and distinct sound cues.</li>
       </ul>
 
       <div style="margin:16px 0; padding:14px; background:#181818; border:1px solid #333; border-radius:12px;">
@@ -279,107 +279,620 @@ const stateEl = $('state'), textEl = $('text');
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 const T_RAW = {
-  'te-IN': {
-    greet: 'నమస్కారం! నేను స్వరం. మీకు ఎలా సహాయపడగలను? చెప్పండి.',
-    selected: 'తెలుగు ఎంచుకున్నారు. మీరు ఏమి తెలుసుకోవాలనుకుంటున్నారు?',
-    err: 'క్షమించండి, ఏదో తప్పు జరిగింది. మళ్ళీ స్క్రీన్‌ను తాకండి.',
-    idle: 'మాట్లాడటానికి తాకండి', listening: 'వింటున్నాను...', thinking: 'ఆలోచిస్తున్నాను...', speaking: 'సమాధానం చెబుతున్నాను...'
+  "te-IN": {
+    "greet": "నమస్కారం! నేను స్వరం. మీకు ఎలా సహాయపడగలను? చెప్పండి.",
+    "selected": "తెలుగు ఎంచుకున్నారు. మీరు ఏమి తెలుసుకోవాలనుకుంటున్నారు?",
+    "err": "క్షమించండి, ఏదో తప్పు జరిగింది. మళ్ళీ స్క్రీన్‌ను తాకండి.",
+    "idle": "మాట్లాడటానికి తాకండి",
+    "listening": "వింటున్నాను...",
+    "thinking": "ఆలోచిస్తున్నాను...",
+    "speaking": "సమాధానం చెబుతున్నాను..."
   },
-  'hi-IN': {
-    greet: 'नमस्ते! मैं स्वरम हूँ। मैं आपकी क्या मदद कर सकता हूँ? बोलिए।',
-    selected: 'हिंदी चुनी गई। आप क्या जानना चाहते हैं?',
-    err: 'माफ़ कीजिए, कुछ गड़बड़ हो गई। कृपया स्क्रीन को फिर से छुएँ।',
-    idle: 'बोलने के लिए छुएँ', listening: 'सुन रहा हूँ...', thinking: 'सोच रहा हूँ...', speaking: 'उत्तर दे रहा हूँ...'
+  "hi-IN": {
+    "greet": "नमस्ते! मैं स्वरम हूँ। मैं आपकी क्या मदद कर सकता हूँ? बोलिए।",
+    "selected": "हिंदी चुनी गई। आप क्या जानना चाहते हैं?",
+    "err": "माफ़ कीजिए, कुछ गड़बड़ हो गई। कृपया स्क्रीन को फिर से छुएँ।",
+    "idle": "बोलने के लिए छुएँ",
+    "listening": "सुन रहा हूँ...",
+    "thinking": "सोच रहा हूँ...",
+    "speaking": "उत्तर दे रहा हूँ..."
   },
-  'en-IN': {
-    greet: 'Hello! I am Swaram, your AI assistant. How can I help you today? Please speak.',
-    selected: 'English selected. What would you like to know?',
-    err: 'Sorry, something went wrong. Please tap and try again.',
-    idle: 'Tap anywhere to talk', listening: 'Listening to you...', thinking: 'Thinking...', speaking: 'Answering...'
+  "en-IN": {
+    "greet": "Hello! I am Swaram, your AI assistant. How can I help you today? Please speak.",
+    "selected": "English selected. What would you like to know?",
+    "err": "Sorry, something went wrong. Please tap and try again.",
+    "idle": "Tap anywhere to talk",
+    "listening": "Listening to you...",
+    "thinking": "Thinking...",
+    "speaking": "Answering..."
+  },
+  "ta-IN": {
+    "greet": "வணக்கம்! நான் ஸ்வரம். உங்களுக்கு நான் எப்படி உதவலாம்? சொல்லுங்கள்.",
+    "selected": "தமிழ் தேர்ந்தெடுக்கப்பட்டது. நீங்கள் என்ன தெரிந்து கொள்ள விரும்புகிறீர்கள்?",
+    "err": "மன்னிக்கவும், ஏதோ தவறு நடந்துவிட்டது. திரையைத் தொட்டு மீண்டும் முயற்சிக்கவும்.",
+    "idle": "பேச திரையைத் தொடவும்",
+    "listening": "கேட்கிறேன்...",
+    "thinking": "யோசிக்கிறேன்...",
+    "speaking": "பதில் கூறுகிறேன்..."
+  },
+  "kn-IN": {
+    "greet": "ನಮಸ್ಕಾರ! ನಾನು ಸ್ವರಂ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ? ಮಾತನಾಡಿ.",
+    "selected": "ಕನ್ನಡವನ್ನು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ. ನೀವು ಏನು ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?",
+    "err": "ಕ್ಷಮಿಸಿ, ಏನೋ ತಪ್ಪಾಗಿದೆ. ಪರದೆಯನ್ನು ಮುಟ್ಟಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "idle": "ಮಾತನಾಡಲು ಮುಟ್ಟಿ",
+    "listening": "ಕೇಳುತ್ತಿದ್ದೇನೆ...",
+    "thinking": "ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ...",
+    "speaking": "ಉತ್ತರಿಸುತ್ತಿದ್ದೇನೆ..."
+  },
+  "ml-IN": {
+    "greet": "നമസ്കാരം! ഞാൻ സ്വരം. ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം? പറയൂ.",
+    "selected": "മലയാളം തിരഞ്ഞെടുത്തു. എന്താണ് അറിയേണ്ടത്?",
+    "err": "ക്ഷമിക്കണം, എന്തോ തകരാറുണ്ടായി. സ്ക്രീനിൽ തൊട്ട് വീണ്ടും ശ്രമിക്കൂ.",
+    "idle": "സംസാരിക്കാൻ സ്ക്രീനിൽ തൊടുക",
+    "listening": "കേൾക്കുന്നു...",
+    "thinking": "ചിന്തിക്കുന്നു...",
+    "speaking": "മറുപടി നൽകുന്നു..."
+  },
+  "mr-IN": {
+    "greet": "नमस्कार! मी स्वरम आहे. मी तुम्हाला कशी मदत करू शकतो? बोला.",
+    "selected": "मराठी निवडली आहे. आपल्याला काय जाणून घ्यायचे आहे?",
+    "err": "माफ करा, काहीतरी चूक झाली. स्क्रीनला स्पर्श करून पुन्हा प्रयत्न करा.",
+    "idle": "बोलण्यासाठी स्पर्श करा",
+    "listening": "ऐकत आहे...",
+    "thinking": "विचार करत आहे...",
+    "speaking": "उत्तर देत आहे..."
+  },
+  "bn-IN": {
+    "greet": "নমস্কার! আমি স্বরম। আপনাকে কীভাবে সাহায্য করতে পারি? বলুন।",
+    "selected": "বাংলা নির্বাচিত হয়েছে। আপনি কী জানতে চান?",
+    "err": "দুঃখিত, কিছু ভুল হয়েছে। স্ক্রিন স্পর্শ করে আবার চেষ্টা করুন।",
+    "idle": "কথা বলতে স্পর্শ করুন",
+    "listening": "শুনছি...",
+    "thinking": "চিন্তা করছি...",
+    "speaking": "উত্তর দিচ্ছি..."
+  },
+  "gu-IN": {
+    "greet": "નમસ્તે! હું સ્વરમ છું. હું તમારી શું મદદ કરી શકું? બોલો.",
+    "selected": "ગુજરાતી પસંદ કરવામાં આવી છે. તમે શું જાણવા માગો છો?",
+    "err": "માફ કરશો, કંઈક ભૂલ થઈ છે. સ્ક્રીનને સ્પર્શ કરીને ફરી પ્રયાસ કરો.",
+    "idle": "બોલવા માટે સ્ક્રીન અડો",
+    "listening": "સાંભળી રહ્યો છું...",
+    "thinking": "વિચારી રહ્યો છું...",
+    "speaking": "જવાબ આપી રહ્યો છું..."
+  },
+  "pa-IN": {
+    "greet": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਸਵਰਮ ਹਾਂ। ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ? ਬੋਲੋ।",
+    "selected": "ਪੰਜਾਬੀ ਚੁਣੀ ਗਈ ਹੈ। ਤੁਸੀਂ ਕੀ ਜਾਣਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    "err": "ਮਾਫ਼ ਕਰਨਾ, ਕੋਈ ਗੜਬੜ ਹੋ ਗਈ। ਸਕ੍ਰੀਨ ਛੂਹ ਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "idle": "ਬੋਲਣ ਲਈ ਸਕ੍ਰੀਨ ਛੂਹੋ",
+    "listening": "ਸੁਣ ਰਿਹਾ ਹਾਂ...",
+    "thinking": "ਸੋਚ ਰਿਹਾ ਹਾਂ...",
+    "speaking": "ਜਵਾਬ ਦੇ ਰਿਹਾ ਹਾਂ..."
+  },
+  "ur-IN": {
+    "greet": "ہیلو! میں سورم ہوں۔ میں آپ کی کیا مدد کر سکتا ہوں؟ بولیے۔",
+    "selected": "اردو منتخب کی گئی۔ آپ کیا جاننا چاہتے ہیں؟",
+    "err": "معاف کیجیے گا، کچھ خرابی ہوئی۔ اسکرین چھو کر دوبارہ کوشش کیجیے۔",
+    "idle": "بولنے کے لیے اسکرین چھوئیں",
+    "listening": "سن رہا ہوں...",
+    "thinking": "سوچ رہا ہوں...",
+    "speaking": "جواب دے رہا ہوں..."
   }
 };
 
-// ================= extra spoken messages =================
+// Spoken voice prompts across all 11 Indian regional languages
 const V_RAW = {
-  'en-IN': {
-    opening: 'Opening ', tapToOpen: 'Tap the screen to open ',
-    repeat: 'I could not hear you clearly. Please say it again in a full sentence.',
-    enrollStart: 'Let us set up voice lock. I will ask four times. Each time, say any short sentence in your normal voice. Start now.',
-    enrollNext: 'Good. Say another sentence.',
-    enrollDone: 'Voice lock is on. Swaram will now work only for your voice.',
-    mismatch: 'This voice does not match the owner. Swaram does not work for other people.',
-    lockOff: 'Voice lock removed.',
-    lockHow: 'Voice lock is on. To remove it, say remove voice lock in your own voice.',
-    noMic: 'I need microphone permission to check your voice.',
-    calling: 'Calling ', callTap: '. If the phone dialer does not open, tap the screen.',
-    noContact: 'I could not find that contact. Say add contact, then the name and the phone number.',
-    saved: 'Contact saved: ',
-    addFail: 'Please say: add contact, the name, and the 10 digit phone number.',
-    noContacts: 'You have no saved contacts yet. Say add contact, then the name and the number.',
-    contactsAre: 'Your contacts are: ',
-    guestOn: 'Guest mode is on for 10 minutes. Anyone can talk to Swaram now, but calls, contacts and settings still need the owner voice.',
-    guestOff: 'Guest mode is off. Swaram works only for the owner again.',
-    guestEnded: 'Guest time is over. Swaram works only for the owner again.',
-    guestBlocked: 'This needs the owner voice. A guest can only learn and ask questions.',
-    cantHangup: 'I cannot end phone calls from a web page. Please press the red end button on your phone.',
-    cancelled: 'Okay, cancelled.'
+  "en-IN": {
+    "opening": "Opening ",
+    "tapToOpen": "Tap the screen to open ",
+    "repeat": "I could not hear you clearly. Please say it again in a full sentence.",
+    "enrollStart": "Let us set up voice lock. I will ask four times. Each time, say any short sentence in your normal voice. Start now.",
+    "enrollNext": "Good. Say another sentence.",
+    "enrollDone": "Voice lock is on. Swaram will now work only for your voice.",
+    "mismatch": "This voice does not match the owner. Swaram does not work for other people.",
+    "lockOff": "Voice lock removed.",
+    "lockHow": "Voice lock is on. To remove it, say remove voice lock in your own voice.",
+    "noMic": "I need microphone permission to check your voice.",
+    "calling": "Calling ",
+    "callTap": ". If the phone dialer does not open, tap the screen.",
+    "noContact": "I could not find that contact. Say add contact, then the name and the phone number.",
+    "saved": "Contact saved: ",
+    "addFail": "Please say: add contact, the name, and the 10 digit phone number.",
+    "noContacts": "You have no saved contacts yet. Say add contact, then the name and the number.",
+    "contactsAre": "Your contacts are: ",
+    "guestOn": "Guest mode is on for 10 minutes. Anyone can talk to Swaram now, but calls, contacts and settings still need the owner voice.",
+    "guestOff": "Guest mode is off. Swaram works only for the owner again.",
+    "guestEnded": "Guest time is over. Swaram works only for the owner again.",
+    "guestBlocked": "This needs the owner voice. A guest can only learn and ask questions.",
+    "cantHangup": "I cannot end phone calls from a web page. Please press the red end button on your phone.",
+    "cancelled": "Okay, cancelled.",
+    "batteryLevel": "The battery is ",
+    "charging": " and currently charging.",
+    "batteryErr": "Battery status is not supported on this browser.",
+    "timeIs": "The current time is ",
+    "dateIs": "Today is ",
+    "remindSet": "Okay, I will remind you in ",
+    "to": " to ",
+    "remindAlert": "Reminder: ",
+    "remindErr": "Could not understand reminder. Say for example: remind me to take medicine in 5 minutes.",
+    "noRemind": "You have no active reminders.",
+    "rateChanged": "Voice speed changed to ",
+    "noPrev": "No previous answer to repeat.",
+    "modeEnded": "Mode ended. Returning to assistant.",
+    "chatReady": "Voice chat mode ready. Ask me anything.",
+    "choosePdf": "Please choose your study notes PDF.",
+    "checkMed": "Checking medicine. Please hold the strip in front of the camera.",
+    "checkCurr": "Checking currency. Please hold the note in front of the camera.",
+    "checkColor": "Checking color and lighting in front of the camera.",
+    "askWhere": "Where do you want to go?",
+    "navTo": "Opening Google Maps navigation to "
   },
-  'te-IN': {
-    opening: 'తెరుస్తున్నాను: ', tapToOpen: 'తెరవడానికి స్క్రీన్‌ను తాకండి: ',
-    repeat: 'స్పష్టంగా వినపడలేదు. దయచేసి పూర్తి వాక్యంలో మళ్ళీ చెప్పండి.',
-    enrollStart: 'వాయిస్ లాక్ సెట్ చేద్దాం. నేను నాలుగు సార్లు అడుగుతాను. ప్రతిసారి మీ మామూలు గొంతుతో ఏదైనా చిన్న వాక్యం చెప్పండి. ఇప్పుడు మొదలుపెట్టండి.',
-    enrollNext: 'బాగుంది. మరో వాక్యం చెప్పండి.',
-    enrollDone: 'వాయిస్ లాక్ ఆన్ అయింది. ఇకపై స్వరం మీ గొంతుకే పనిచేస్తుంది.',
-    mismatch: 'ఈ గొంతు యజమానిది కాదు. స్వరం ఇతరులకు పనిచేయదు.',
-    lockOff: 'వాయిస్ లాక్ తీసేశాను.',
-    lockHow: 'వాయిస్ లాక్ ఆన్‌లో ఉంది. తీయాలంటే, మీ గొంతుతో వాయిస్ లాక్ తీసేయి అని చెప్పండి.',
-    noMic: 'మీ గొంతును గుర్తించడానికి మైక్రోఫోన్ అనుమతి కావాలి.',
-    calling: 'కాల్ చేస్తున్నాను: ', callTap: '. డయలర్ తెరవకపోతే స్క్రీన్‌ను తాకండి.',
-    noContact: 'ఆ కాంటాక్ట్ దొరకలేదు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి, పేరు, ఫోన్ నంబర్ చెప్పండి.',
-    saved: 'కాంటాక్ట్ సేవ్ చేశాను: ',
-    addFail: 'దయచేసి కాంటాక్ట్ యాడ్ చేయి, పేరు, పది అంకెల ఫోన్ నంబర్ అని చెప్పండి.',
-    noContacts: 'ఇంకా కాంటాక్ట్స్ లేవు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి పేరు, నంబర్ చెప్పండి.',
-    contactsAre: 'మీ కాంటాక్ట్స్: ',
-    guestOn: 'గెస్ట్ మోడ్ పది నిమిషాలు ఆన్‌లో ఉంది. ఇప్పుడు ఎవరైనా స్వరంతో మాట్లాడవచ్చు, కానీ కాల్స్, కాంటాక్ట్స్, సెట్టింగ్స్‌కు యజమాని గొంతు కావాలి.',
-    guestOff: 'గెస్ట్ మోడ్ ఆఫ్ అయింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.',
-    guestEnded: 'గెస్ట్ సమయం ముగిసింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.',
-    guestBlocked: 'దీనికి యజమాని గొంతు కావాలి. అతిథి నేర్చుకోవచ్చు, ప్రశ్నలు అడగవచ్చు మాత్రమే.',
-    cantHangup: 'వెబ్ పేజీ నుంచి ఫోన్ కాల్ ముగించలేను. దయచేసి మీ ఫోన్‌లోని ఎరుపు బటన్ నొక్కండి.',
-    cancelled: 'సరే, రద్దు చేశాను.'
+  "te-IN": {
+    "opening": "తెరుస్తున్నాను: ",
+    "tapToOpen": "తెరవడానికి స్క్రీన్‌ను తాకండి: ",
+    "repeat": "స్పష్టంగా వినపడలేదు. దయచేసి పూర్తి వాక్యంలో మళ్ళీ చెప్పండి.",
+    "enrollStart": "వాయిస్ లాక్ సెట్ చేద్దాం. నేను నాలుగు సార్లు అడుగుతాను. ప్రతిసారి మీ మామూలు గొంతుతో ఏదైనా చిన్న వాక్యం చెప్పండి. ఇప్పుడు మొదలుపెట్టండి.",
+    "enrollNext": "బాగుంది. మరో వాక్యం చెప్పండి.",
+    "enrollDone": "వాయిస్ లాక్ ఆన్ అయింది. ఇకపై స్వరం మీ గొంతుకే పనిచేస్తుంది.",
+    "mismatch": "ఈ గొంతు యజమానిది కాదు. స్వరం ఇతరులకు పనిచేయదు.",
+    "lockOff": "వాయిస్ లాక్ తీసేశాను.",
+    "lockHow": "వాయిస్ లాక్ ఆన్‌లో ఉంది. తీయాలంటే, మీ గొంతుతో వాయిస్ లాక్ తీసేయి అని చెప్పండి.",
+    "noMic": "మీ గొంతును గుర్తించడానికి మైక్రోఫోన్ అనుమతి కావాలి.",
+    "calling": "కాల్ చేస్తున్నాను: ",
+    "callTap": ". డయలర్ తెరవకపోతే స్క్రీన్‌ను తాకండి.",
+    "noContact": "ఆ కాంటాక్ట్ దొరకలేదు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి, పేరు, ఫోన్ నంబర్ చెప్పండి.",
+    "saved": "కాంటాక్ట్ సేవ్ చేశాను: ",
+    "addFail": "దయచేసి కాంటాక్ట్ యాడ్ చేయి, పేరు, పది అంకెల ఫోన్ నంబర్ అని చెప్పండి.",
+    "noContacts": "ఇంకా కాంటాక్ట్స్ లేవు. కాంటాక్ట్ యాడ్ చేయి అని చెప్పి పేరు, నంబర్ చెప్పండి.",
+    "contactsAre": "మీ కాంటాక్ట్స్: ",
+    "guestOn": "గెస్ట్ మోడ్ పది నిమిషాలు ఆన్‌లో ఉంది. ఇప్పుడు ఎవరైనా స్వరంతో మాట్లాడవచ్చు, కానీ కాల్స్, కాంటాక్ట్స్, సెట్టింగ్స్‌కు యజమాని గొంతు కావాలి.",
+    "guestOff": "గెస్ట్ మోడ్ ఆఫ్ అయింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.",
+    "guestEnded": "గెస్ట్ సమయం ముగిసింది. స్వరం మళ్ళీ యజమానికే పనిచేస్తుంది.",
+    "guestBlocked": "దీనికి యజమాని గొంతు కావాలి. అతిథి నేర్చుకోవచ్చు, ప్రశ్నలు అడగవచ్చు మాత్రమే.",
+    "cantHangup": "వెబ్ పేజీ నుంచి ఫోన్ కాల్ ముగించలేను. దయచేసి మీ ఫోన్‌లోని ఎరుపు బటన్ నొక్కండి.",
+    "cancelled": "సరే, రద్దు చేశాను.",
+    "batteryLevel": "బ్యాటరీ ",
+    "charging": " శాతం ఉంది, ఛార్జ్ అవుతోంది.",
+    "batteryErr": "ఈ బ్రౌజర్‌లో బ్యాటరీ స్థితి అందుబాటులో లేదు.",
+    "timeIs": "ప్రస్తుత సమయం ",
+    "dateIs": "ఈ రోజు ",
+    "remindSet": "సరే, నేను మీకు గుర్తుచేస్తాను: ",
+    "to": " ",
+    "remindAlert": "రిమైండర్: ",
+    "remindErr": "రిమైండర్ అర్థం కాలేదు. ఉదాహరణకు: 5 నిమిషాల్లో మందులు వేసుకోవాలని గుర్తుచేయి అని చెప్పండి.",
+    "noRemind": "మీకు ఎటువంటి యాక్టివ్ రిమైండర్‌లు లేవు.",
+    "rateChanged": "వాయిస్ వేగం మార్చబడింది: ",
+    "noPrev": "పునరావృతం చేయడానికి ముందు సమాధానం ఏమీ లేదు.",
+    "modeEnded": "ముగించబడింది. సాధారణ అసిస్టెంట్‌కు తిరిగి వచ్చాము.",
+    "chatReady": "వాయిస్ చాట్ మోడ్ సిద్ధంగా ఉంది. ఏదైనా అడగండి.",
+    "choosePdf": "దయచేసి మీ పిడిఎఫ్ నోట్స్ ఎంచుకోండి.",
+    "checkMed": "మందుల వివరాలు పరిశీలిస్తున్నాను. కెమెరా ముందు మందు ప్యాక్ చూపించండి.",
+    "checkCurr": "కరెన్సీ నోటు పరిశీలిస్తున్నాను. నోటును కెమెరా ముందు ఉంచండి.",
+    "checkColor": "రంగు మరియు వెలుతురు గుర్తిస్తున్నాను.",
+    "askWhere": "మీరు ఎక్కడికి వెళ్ళాలనుకుంటున్నారు?",
+    "navTo": "గూగుల్ మ్యాప్స్ నావిగేషన్ తెరుస్తున్నాను: "
   },
-  'hi-IN': {
-    opening: 'खोल रहा हूँ: ', tapToOpen: 'खोलने के लिए स्क्रीन को छुएँ: ',
-    repeat: 'साफ़ सुनाई नहीं दिया। कृपया पूरे वाक्य में फिर से बोलिए।',
-    enrollStart: 'आवाज़ लॉक सेट करते हैं। मैं चार बार कहूँगा। हर बार अपनी सामान्य आवाज़ में कोई छोटा वाक्य बोलिए। अब शुरू कीजिए।',
-    enrollNext: 'अच्छा। एक और वाक्य बोलिए।',
-    enrollDone: 'आवाज़ लॉक चालू हो गया। अब स्वरम सिर्फ़ आपकी आवाज़ पर काम करेगा।',
-    mismatch: 'यह आवाज़ मालिक की नहीं है। स्वरम दूसरों के लिए काम नहीं करता।',
-    lockOff: 'आवाज़ लॉक हटा दिया।',
-    lockHow: 'आवाज़ लॉक चालू है। हटाने के लिए अपनी आवाज़ में आवाज़ लॉक हटाओ बोलिए।',
-    noMic: 'आपकी आवाज़ पहचानने के लिए माइक्रोफ़ोन की अनुमति चाहिए।',
-    calling: 'कॉल कर रहा हूँ: ', callTap: '। अगर डायलर न खुले तो स्क्रीन को छुएँ।',
-    noContact: 'वह संपर्क नहीं मिला। कॉन्टैक्ट जोड़ो बोलकर नाम और फ़ोन नंबर बताइए।',
-    saved: 'संपर्क सेव हो गया: ',
-    addFail: 'कृपया बोलिए: कॉन्टैक्ट जोड़ो, नाम, और दस अंकों का फ़ोन नंबर।',
-    noContacts: 'अभी कोई संपर्क सेव नहीं है। कॉन्टैक्ट जोड़ो बोलकर नाम और नंबर बताइए।',
-    contactsAre: 'आपके संपर्क: ',
-    guestOn: 'मेहमान मोड दस मिनट के लिए चालू है। अब कोई भी स्वरम से बात कर सकता है, लेकिन कॉल, संपर्क और सेटिंग के लिए मालिक की आवाज़ चाहिए।',
-    guestOff: 'मेहमान मोड बंद हो गया। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।',
-    guestEnded: 'मेहमान का समय खत्म हुआ। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।',
-    guestBlocked: 'इसके लिए मालिक की आवाज़ चाहिए। मेहमान सिर्फ़ सीख सकता है और सवाल पूछ सकता है।',
-    cantHangup: 'मैं वेब पेज से फ़ोन कॉल खत्म नहीं कर सकता। कृपया फ़ोन का लाल बटन दबाइए।',
-    cancelled: 'ठीक है, रद्द कर दिया।'
+  "hi-IN": {
+    "opening": "खोल रहा हूँ: ",
+    "tapToOpen": "खोलने के लिए स्क्रीन को छुएँ: ",
+    "repeat": "साफ़ सुनाई नहीं दिया। कृपया पूरे वाक्य में फिर से बोलिए।",
+    "enrollStart": "आवाज़ लॉक सेट करते हैं। मैं चार बार कहूँगा। हर बार अपनी सामान्य आवाज़ में कोई छोटा वाक्य बोलिए। अब शुरू कीजिए।",
+    "enrollNext": "अच्छा। एक और वाक्य बोलिए।",
+    "enrollDone": "आवाज़ लॉक चालू हो गया। अब स्वरम सिर्फ़ आपकी आवाज़ पर काम करेगा।",
+    "mismatch": "यह आवाज़ मालिक की नहीं है। स्वरम दूसरों के लिए काम नहीं करता।",
+    "lockOff": "आवाज़ लॉक हटा दिया।",
+    "lockHow": "आवाज़ लॉक चालू है। हटाने के लिए अपनी आवाज़ में आवाज़ लॉक हटाओ बोलिए।",
+    "noMic": "आपकी आवाज़ पहचानने के लिए माइक्रोफ़ोन की अनुमति चाहिए।",
+    "calling": "कॉल कर रहा हूँ: ",
+    "callTap": "। अगर डायलर न खुले तो स्क्रीन को छुएँ।",
+    "noContact": "वह संपर्क नहीं मिला। कॉन्टैक्ट जोड़ो बोलकर नाम और फ़ोन नंबर बताइए।",
+    "saved": "संपर्क सेव हो गया: ",
+    "addFail": "कृपया बोलिए: कॉन्टैक्ट जोड़ो, नाम, और दस अंकों का फ़ोन नंबर।",
+    "noContacts": "अभी कोई संपर्क सेव नहीं है। कॉन्टैक्ट जोड़ो बोलकर नाम और नंबर बताइए।",
+    "contactsAre": "आपके संपर्क: ",
+    "guestOn": "मेहमान मोड दस मिनट के लिए चालू है। अब कोई भी स्वरम से बात कर सकता है, लेकिन कॉल, संपर्क और सेटिंग के लिए मालिक की आवाज़ चाहिए।",
+    "guestOff": "मेहमान मोड बंद हो गया। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।",
+    "guestEnded": "मेहमान का समय खत्म हुआ। स्वरम फिर से सिर्फ़ मालिक के लिए काम करेगा।",
+    "guestBlocked": "इसके लिए मालिक की आवाज़ चाहिए। मेहमान सिर्फ़ सीख सकता है और सवाल पूछ सकता है।",
+    "cantHangup": "मैं वेब पेज से फ़ोन कॉल खत्म नहीं कर सकता। कृपया फ़ोन का लाल बटन दबाइए।",
+    "cancelled": "ठीक है, रद्द कर दिया।",
+    "batteryLevel": "बैटरी ",
+    "charging": " प्रतिशत है और चार्ज हो रही है।",
+    "batteryErr": "इस ब्राउज़र पर बैटरी स्थिति उपलब्ध नहीं है।",
+    "timeIs": "अभी का समय है ",
+    "dateIs": "आज ",
+    "remindSet": "ठीक है, मैं आपको याद दिलाऊँगा: ",
+    "to": " ",
+    "remindAlert": "रिमाइंडर: ",
+    "remindErr": "रिमाइंडर समझ नहीं आया। ऐसे कहें: 5 मिनट में दवा लेना याद दिलाना।",
+    "noRemind": "आपका कोई सक्रिय रिमाइंडर नहीं है।",
+    "rateChanged": "बोलने की गति कर दी गई है: ",
+    "noPrev": "दोहराने के लिए कोई पिछला उत्तर नहीं है।",
+    "modeEnded": "समाप्त किया गया। सहायक पर वापस आ गए हैं।",
+    "chatReady": "वॉयस चैट मोड तैयार है। कुछ भी पूछिए।",
+    "choosePdf": "कृपया अपने अध्ययन नोट्स पीडीएफ चुनें।",
+    "checkMed": "दवा की जाँच कर रहा हूँ। कृपया दवा को कैमरे के सामने रखें।",
+    "checkCurr": "रुपये की जाँच कर रहा हूँ। नोट को कैमरे के सामने रखें।",
+    "checkColor": "रंग और रोशनी की पहचान कर रहा हूँ।",
+    "askWhere": "आप कहाँ जाना चाहते हैं?",
+    "navTo": "गूगल मैप्स नेविगेशन खोल रहा हूँ: "
+  },
+  "ta-IN": {
+    "opening": "திறக்கிறேன்: ",
+    "tapToOpen": "திறக்க திரையைத் தொடவும்: ",
+    "repeat": "சரியாகக் கேட்கவில்லை. தயவுசெய்து முழு வாக்கியத்தில் மீண்டும் சொல்லுங்கள்.",
+    "enrollStart": "குரல் பூட்டு அமைக்கலாம். நான் நான்கு முறை கேட்பேன். ஒவ்வொரு முறையும் உங்கள் வழக்கமான குரலில் ஒரு சிறு வாக்கியம் சொல்லுங்கள். இப்போது தொடங்குங்கள்.",
+    "enrollNext": "நன்று. மற்றொரு வாக்கியம் சொல்லுங்கள்.",
+    "enrollDone": "குரல் பூட்டு ஆன் செய்யப்பட்டது. இனி ஸ்வரம் உங்கள் குரலுக்கு மட்டுமே பதிலளிக்கும்.",
+    "mismatch": "இந்தக் குரல் உரிமையாளருடையது அல்ல. ஸ்வரம் மற்றவர்களுக்குப் பதிலளிக்காது.",
+    "lockOff": "குரல் பூட்டு நீக்கப்பட்டது.",
+    "lockHow": "குரல் பூட்டு ஆன் செய்யப்பட்டுள்ளது. நீக்க உங்கள் சொந்தக் குரலில் குரல் பூட்டை நீக்கு என்று சொல்லுங்கள்.",
+    "noMic": "குரலை அடையாளம் காண மைக்ரோஃபோன் அனுமதி தேவை.",
+    "calling": "அழைக்கிறேன்: ",
+    "callTap": ". டயலர் திறக்கவில்லை என்றால் திரையைத் தொடவும்.",
+    "noContact": "அந்தத் தொடர்பு கிடைக்கவில்லை. தொடர்பு சேர் என்று சொல்லி பெயர் மற்றும் எண்ணைக் கூறவும்.",
+    "saved": "தொடர்பு சேமிக்கப்பட்டது: ",
+    "addFail": "தயவுசெய்து தொடர்பு சேர், பெயர் மற்றும் 10 இலக்க ஃபோன் எண்ணைச் சொல்லவும்.",
+    "noContacts": "இன்னும் தொடர்புகள் எதுவும் இல்லை. தொடர்பு சேர் என்று சொல்லி எண் சேர்க்கவும்.",
+    "contactsAre": "உங்கள் தொடர்புகள்: ",
+    "guestOn": "விருந்தினர் பயன்முறை பத்து நிமிடங்களுக்கு ஆன் செய்யப்பட்டுள்ளது.",
+    "guestOff": "விருந்தினர் பயன்முறை ஆஃப் செய்யப்பட்டது. ஸ்வரம் மீண்டும் உரிமையாளருக்கு மட்டுமே செயல்படும்.",
+    "guestEnded": "விருந்தினர் நேரம் முடிந்தது. ஸ்வரம் மீண்டும் உரிமையாளருக்கு மட்டுமே செயல்படும்.",
+    "guestBlocked": "இதற்கு உரிமையாளரின் குரல் தேவை. விருந்தினர் கேள்விகள் மட்டுமே கேட்க முடியும்.",
+    "cantHangup": "வலைப்பக்கத்திலிருந்து அழைப்பை முடிக்க முடியாது. ஃபோனின் சிவப்பு பொத்தானை அழுத்தவும்.",
+    "cancelled": "சரி, ரத்து செய்யப்பட்டது.",
+    "batteryLevel": "பேட்டரி ",
+    "charging": " சதவீதம் உள்ளது மற்றும் சார்ஜ் ஆகிறது.",
+    "batteryErr": "இந்த உலாவியில் பேட்டரி நிலை ஆதரிக்கப்படவில்லை.",
+    "timeIs": "தற்போதைய நேரம் ",
+    "dateIs": "இன்று ",
+    "remindSet": "சரி, நான் உங்களுக்கு நினைவூட்டுவேன்: ",
+    "to": " ",
+    "remindAlert": "நினைவூட்டல்: ",
+    "remindErr": "நினைவூட்டல் புரியவில்லை. உதாரணத்திற்கு: 5 நிமிடங்களில் மாத்திரை சாப்பிட நினைவூட்டு என்று சொல்லுங்கள்.",
+    "noRemind": "உங்களுக்கு எந்த நினைவூட்டல்களும் இல்லை.",
+    "rateChanged": "குரல் வேகம் மாற்றப்பட்டது: ",
+    "noPrev": "மீண்டும் சொல்ல முந்தைய பதில் எதுவும் இல்லை.",
+    "modeEnded": "பயன்முறை முடிந்தது. பொது உதவியாளருக்குத் திரும்பியது.",
+    "chatReady": "குரல் அரட்டை பயன்முறை தயார். ஏதேனும் கேளுங்கள்.",
+    "choosePdf": "தயவுசெய்து உங்கள் பாடக் குறிப்புகள் PDF ஐத் தேர்ந்தெடுக்கவும்.",
+    "checkMed": "மருந்தைச் சரிபார்க்கிறேன். கேமராவின் முன் மருந்தைக் காட்டவும்.",
+    "checkCurr": "பணத்தைச் சரிபார்க்கிறேன். ரூபாய் நோட்டை கேமராவின் முன் காட்டவும்.",
+    "checkColor": "நிறம் மற்றும் வெளிச்சத்தை ஆய்வு செய்கிறேன்.",
+    "askWhere": "நீங்கள் எங்கு செல்ல விரும்புகிறீர்கள்?",
+    "navTo": "கூகிள் மேப்ஸ் வழிகாட்டலைத் திறக்கிறேன்: "
+  },
+  "kn-IN": {
+    "opening": "ತೆರೆಯುತ್ತಿದ್ದೇನೆ: ",
+    "tapToOpen": "ತೆರೆಯಲು ಪರದೆಯನ್ನು ಮುಟ್ಟಿ: ",
+    "repeat": "ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಿಸಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಪೂರ್ಣ ವಾಕ್ಯದಲ್ಲಿ ಮತ್ತೆ ಹೇಳಿ.",
+    "enrollStart": "ಧ್ವನಿ ಲಾಕ್ ಹೊಂದಿಸೋಣ. ನಾನು ನಾಲ್ಕು ಬಾರಿ ಕೇಳುತ್ತೇನೆ. ಪ್ರತಿ ಬಾರಿ ನಿಮ್ಮ ಸಾಮಾನ್ಯ ಧ್ವನಿಯಲ್ಲಿ ಸಣ್ಣ ವಾಕ್ಯ ಹೇಳಿ. ಈಗ ಪ್ರಾರಂಭಿಸಿ.",
+    "enrollNext": "ಉತ್ತಮ. ಇನ್ನೊಂದು ವಾಕ್ಯ ಹೇಳಿ.",
+    "enrollDone": "ಧ್ವನಿ ಲಾಕ್ ಆನ್ ಆಗಿದೆ. ಇನ್ನು ಮುಂದೆ ಸ್ವರಂ ನಿಮ್ಮ ಧ್ವನಿಗೆ ಮಾತ್ರ ಸ್ಪಂದಿಸುತ್ತದೆ.",
+    "mismatch": "ಈ ಧ್ವನಿ ಮಾಲೀಕರದಲ್ಲ. ಸ್ವರಂ ಇತರರಿಗೆ ಕೆಲಸ ಮಾಡುವುದಿಲ್ಲ.",
+    "lockOff": "ಧ್ವನಿ ಲಾಕ್ ತೆಗೆದುಹಾಕಲಾಗಿದೆ.",
+    "lockHow": "ಧ್ವನಿ ಲಾಕ್ ಆನ್ ಆಗಿದೆ. ತೆಗೆಯಲು ನಿಮ್ಮದೇ ಧ್ವನಿಯಲ್ಲಿ ಧ್ವನಿ ಲಾಕ್ ತೆಗೆ ಎಂದು ಹೇಳಿ.",
+    "noMic": "ಧ್ವನಿ ಗುರುತಿಸಲು ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ ಬೇಕು.",
+    "calling": "ಕರೆ ಮಾಡುತ್ತಿದ್ದೇನೆ: ",
+    "callTap": ". ಡಯಲರ್ ತೆರೆಯದಿದ್ದರೆ ಪರದೆಯನ್ನು ಮುಟ್ಟಿ.",
+    "noContact": "ಆ ಸಂಪರ್ಕ ಸಿಗಲಿಲ್ಲ. ಸಂಪರ್ಕ ಸೇರಿಸಿ ಎಂದು ಹೇಳಿ ಹೆಸರು ಮತ್ತು ಸಂಖ್ಯೆ ತಿಳಿಸಿ.",
+    "saved": "ಸಂಪರ್ಕ ಉಳಿಸಲಾಗಿದೆ: ",
+    "addFail": "ದಯವಿಟ್ಟು ಸಂಪರ್ಕ ಸೇರಿಸಿ, ಹೆಸರು ಮತ್ತು 10 ಅಂಕಿಯ ಫೋನ್ ಸಂಖ್ಯೆ ಹೇಳಿ.",
+    "noContacts": "ಇನ್ನೂ ಯಾವುದೇ ಸಂಪರ್ಕಗಳಿಲ್ಲ. ಸಂಪರ್ಕ ಸೇರಿಸಿ ಎಂದು ಹೇಳಿ ಸಂಖ್ಯೆ ಸೇರಿಸಿ.",
+    "contactsAre": "ನಿಮ್ಮ ಸಂಪರ್ಕಗಳು: ",
+    "guestOn": "ಅತಿಥಿ ಮೋಡ್ ಹತ್ತು ನಿಮಿಷಗಳ ಕಾಲ ಆನ್ ಆಗಿದೆ.",
+    "guestOff": "ಅತಿಥಿ ಮೋಡ್ ಆಫ್ ಆಗಿದೆ. ಸ್ವರಂ ಮತ್ತೆ ಮಾಲೀಕರಿಗೆ ಮಾತ್ರ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ.",
+    "guestEnded": "ಅತಿಥಿ ಸಮಯ ಮುಗಿದಿದೆ. ಸ್ವರಂ ಮತ್ತೆ ಮಾಲೀಕರಿಗೆ ಮಾತ್ರ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ.",
+    "guestBlocked": "ಇದಕ್ಕೆ ಮಾಲೀಕರ ಧ್ವನಿ ಬೇಕು. ಅತಿಥಿ ಕೇವಲ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳಬಹುದು.",
+    "cantHangup": "ವೆಬ್ ಪುಟದಿಂದ ಕರೆ ಕಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಫೋನಿನ ಕೆಂಪು ಬಟನ್ ಒತ್ತಿ.",
+    "cancelled": "ಸರಿ, ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.",
+    "batteryLevel": "ಬ್ಯಾಟರಿ ",
+    "charging": " ಪ್ರತಿಶತ ಇದೆ ಮತ್ತು ಚಾರ್ಜ್ ಆಗುತ್ತಿದೆ.",
+    "batteryErr": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಬ್ಯಾಟರಿ ಮಾಹಿತಿ ಬೆಂಬಲಿಸುವುದಿಲ್ಲ.",
+    "timeIs": "ಪ್ರಸ್ತುತ ಸಮಯ ",
+    "dateIs": "ಇಂದು ",
+    "remindSet": "ಸರಿ, ನಾನು ನಿಮಗೆ ನೆನಪಿಸುತ್ತೇನೆ: ",
+    "to": " ",
+    "remindAlert": "ಜ್ಞಾಪನೆ: ",
+    "remindErr": "ಜ್ಞಾಪನೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ಉದಾಹರಣೆಗೆ: 5 ನಿಮಿಷಗಳಲ್ಲಿ ಔಷಧಿ ತೆಗೆದುಕೊಳ್ಳಲು ನೆನಪಿಸು ಎಂದು ಹೇಳಿ.",
+    "noRemind": "ನಿಮಗೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಜ್ಞಾಪನೆಗಳಿಲ್ಲ.",
+    "rateChanged": "ಧ್ವನಿ ವೇಗ ಬದಲಾಯಿಸಲಾಗಿದೆ: ",
+    "noPrev": "ಪುನರಾವರ್ತಿಸಲು ಹಿಂದಿನ ಉತ್ತರವಿಲ್ಲ.",
+    "modeEnded": "ಮೋಡ್ ಕೊನೆಗೊಂಡಿದೆ. ಸಾಮಾನ್ಯ ಸಹಾಯಕ್ಕೆ ಮರಳಿದೆ.",
+    "chatReady": "ಧ್ವನಿ ಚಾಟ್ ಮೋಡ್ ಸಿದ್ಧವಾಗಿದೆ. ಏನಾದರೂ ಕೇಳಿ.",
+    "choosePdf": "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಅಧ್ಯಯನ ಟಿಪ್ಪಣಿಗಳ PDF ಆಯ್ಕೆಮಾಡಿ.",
+    "checkMed": "ಔಷಧ ತಪಾಸಣೆ ಮಾಡುತ್ತಿದ್ದೇನೆ. ಕ್ಯಾಮೆರಾ ಮುಂದೆ ಔಷಧ ತೋರಿಸಿ.",
+    "checkCurr": "ಹಣ ತಪಾಸಣೆ ಮಾಡುತ್ತಿದ್ದೇನೆ. ನೋಟನ್ನು ಕ್ಯಾಮೆರಾ ಮುಂದೆ ಇಡಿ.",
+    "checkColor": "ಬಣ್ಣ ಮತ್ತು ಬೆಳಕನ್ನು ಪರಿಶೀಲಿಸುತ್ತಿದ್ದೇನೆ.",
+    "askWhere": "ನೀವು ಎಲ್ಲಿಗೆ ಹೋಗಬೇಕೆಂದು ಬಯಸುತ್ತೀರಿ?",
+    "navTo": "ಗೂಗಲ್ ಮ್ಯಾಪ್ಸ್ ನ್ಯಾವಿಗೇಷನ್ ತೆರೆಯುತ್ತಿದ್ದೇನೆ: "
+  },
+  "ml-IN": {
+    "opening": "തുറക്കുന്നു: ",
+    "tapToOpen": "തുറക്കാൻ സ്ക്രീനിൽ തൊടുക: ",
+    "repeat": "വ്യക്തമായി കേട്ടില്ല. ദയവായി പൂർണ്ണ വാക്യത്തിൽ വീണ്ടും പറയൂ.",
+    "enrollStart": "വോയ്സ് ലോക്ക് സജ്ജമാക്കാം. ഞാൻ നാല് തവണ ചോദിക്കും. ഓരോ തവണയും സാധാരണ ശബ്ദത്തിൽ ചെറിയൊരു വാക്യം പറയൂ. ഇപ്പോൾ തുടങ്ങൂ.",
+    "enrollNext": "നന്നായിട്ടുണ്ട്. മറ്റൊരു വാക്യം പറയൂ.",
+    "enrollDone": "വോയ്സ് ലോക്ക് ഓൺ ചെയ്തു. ഇനി സ്വരം നിങ്ങളുടെ ശബ്ദത്തിൽ മാത്രമേ പ്രവർത്തിക്കൂ.",
+    "mismatch": "ഈ ശബ്ദം ഉടമയുടേതല്ല. സ്വരം മറ്റുള്ളവർക്ക് വേണ്ടി പ്രവർത്തിക്കില്ല.",
+    "lockOff": "വോയ്സ് ലോക്ക് മാറ്റി.",
+    "lockHow": "വോയ്സ് ലോക്ക് ഓണാണ്. മാറ്റാൻ നിങ്ങളുടെ ശബ്ദത്തിൽ വോയ്സ് ലോക്ക് ഒഴിവാക്കുക എന്ന് പറയൂ.",
+    "noMic": "ശബ്ദം തിരിച്ചറിയാൻ മൈക്രോഫോൺ അനുമതി ആവശ്യമാണ്.",
+    "calling": "വിളിക്കുന്നു: ",
+    "callTap": ". ഡയലർ തുറന്നില്ലെങ്കിൽ സ്ക്രീനിൽ തൊടുക.",
+    "noContact": "ആ കോൺടാക്റ്റ് കണ്ടെത്തിയില്ല. കോൺടാക്റ്റ് ചേർക്കുക എന്ന് പറഞ്ഞ് പേരും നമ്പറും പറയൂ.",
+    "saved": "കോൺടാക്റ്റ് സേവ് ചെയ്തു: ",
+    "addFail": "ദയവായി കോൺടാക്റ്റ് ചേർക്കുക, പേര്, പത്തക്ക ഫോൺ നമ്പർ എന്ന് പറയൂ.",
+    "noContacts": "കോൺടാക്റ്റുകൾ ഒന്നും ഇതുവരെ സേവ് ചെയ്തിട്ടില്ല.",
+    "contactsAre": "നിങ്ങളുടെ കോൺടാക്റ്റുകൾ: ",
+    "guestOn": "ഗസ്റ്റ് മോഡ് പത്ത് മിനിറ്റിലേക്ക് ഓണാണ്.",
+    "guestOff": "ഗസ്റ്റ് മോഡ് ഓഫായി. സ്വരം വീണ്ടും ഉടമയ്ക്ക് മാത്രം പ്രവർത്തിക്കും.",
+    "guestEnded": "ഗസ്റ്റ് സമയം കഴിഞ്ഞു. സ്വരം വീണ്ടും ഉടമയ്ക്ക് മാത്രം പ്രവർത്തിക്കും.",
+    "guestBlocked": "ഇതിന് ഉടമയുടെ ശബ്ദം വേണം.",
+    "cantHangup": "വെബ് പേജിൽ നിന്ന് കോൾ അവസാനിപ്പിക്കാൻ കഴിയില്ല. ഫോണിലെ ചുവപ്പ് ബട്ടൺ അമർത്തുക.",
+    "cancelled": "ശരി, റദ്ദാക്കി.",
+    "batteryLevel": "ബാറ്ററി ",
+    "charging": " ശതമാനം ഉണ്ട്, ചാർജ്ജാവുന്നു.",
+    "batteryErr": "ഈ ബ്രൗസറിൽ ബാറ്ററി വിവരങ്ങൾ ലഭ്യമല്ല.",
+    "timeIs": "ഇപ്പോഴത്തെ സമയം ",
+    "dateIs": "ഇന്ന് ",
+    "remindSet": "ശരി, ഞാൻ ഓർമ്മിപ്പിക്കാം: ",
+    "to": " ",
+    "remindAlert": "ഓർമ്മപ്പെടുത്തൽ: ",
+    "remindErr": "ഓർമ്മപ്പെടുത്തൽ മനസ്സിലായില്ല. ഉദാഹരണത്തിന്: 5 മിനിറ്റിനുള്ളിൽ മരുന്ന് കഴിക്കാൻ ഓർമ്മിപ്പിക്കുക എന്ന് പറയൂ.",
+    "noRemind": "നിങ്ങൾക്ക് സജീവമായ ഓർമ്മപ്പെടുത്തലുകൾ ഒന്നുമില്ല.",
+    "rateChanged": "ശബ്ദ വേഗത മാറ്റി: ",
+    "noPrev": "ആവർത്തിക്കാൻ മുൻപത്തെ മറുപടി ഒന്നുമില്ല.",
+    "modeEnded": "മോഡ് അവസാനിച്ചു. സഹായിയിലേക്ക് മടങ്ങിയെത്തി.",
+    "chatReady": "വോയ്സ് ചാറ്റ് തയ്യാറാണ്. എന്തും ചോദിക്കൂ.",
+    "choosePdf": "ദയവായി പഠനക്കുറിപ്പുകൾ അടങ്ങിയ പിഡിഎഫ് തിരഞ്ഞെടുക്കൂ.",
+    "checkMed": "മരുന്ന് പരിശോധിക്കുന്നു. ക്യാമറയുടെ മുന്നിൽ മരുന്ന് കാണിക്കൂ.",
+    "checkCurr": "പണം പരിശോധിക്കുന്നു. നോട്ട് ക്യാമറയുടെ മുന്നിൽ വയ്ക്കൂ.",
+    "checkColor": "നിറവും വെളിച്ചവും പരിശോധിക്കുന്നു.",
+    "askWhere": "നിങ്ങൾക്ക് എങ്ങോട്ടാണ് പോകേണ്ടത്?",
+    "navTo": "ഗൂഗിൾ മാപ്സ് നാവിഗേഷൻ തുറക്കുന്നു: "
+  },
+  "mr-IN": {
+    "opening": "उघडत आहे: ",
+    "tapToOpen": "उघडण्यासाठी स्क्रीनला स्पर्श करा: ",
+    "repeat": "स्पष्ट ऐकू आले नाही. कृपया पूर्ण वाक्यात पुन्हा बोला.",
+    "enrollStart": "व्हॉइस लॉक सेट करूया. मी चार वेळा विचारेन. प्रत्येक वेळी आपल्या सामान्य आवाजात लहान वाक्य बोला. आता सुरू करा.",
+    "enrollNext": "छान. दुसरे वाक्य बोला.",
+    "enrollDone": "व्हॉइस लॉक चालू झाले. आता स्वरम फक्त आपल्या आवाजावर काम करेल.",
+    "mismatch": "हा आवाज मालकाचा नाही. स्वरम इतरांसाठी काम करत नाही.",
+    "lockOff": "व्हॉइस लॉक काढले.",
+    "lockHow": "व्हॉइस लॉक चालू आहे. काढण्यासाठी आपल्या आवाजात व्हॉइस लॉक काढा असे म्हणा.",
+    "noMic": "आवाज ओळखण्यासाठी मायक्रोफोन परवानगी आवश्यक आहे.",
+    "calling": "कॉल करत आहे: ",
+    "callTap": ". डायलर न उघडल्यास स्क्रीनला स्पर्श करा.",
+    "noContact": "तो संपर्क सापडला नाही. संपर्क जोडा असे म्हणून नाव आणि नंबर सांगा.",
+    "saved": "संपर्क सेव्ह केला: ",
+    "addFail": "कृपया संपर्क जोडा, नाव आणि १० अंकी फोन नंबर सांगा.",
+    "noContacts": "अजून कोणतेही संपर्क सेव्ह केलेले नाहीत.",
+    "contactsAre": "आपले संपर्क: ",
+    "guestOn": "गेस्ट मोड दहा मिनिटांसाठी चालू आहे.",
+    "guestOff": "गेस्ट मोड बंद झाला. स्वरम पुन्हा फक्त मालकासाठी काम करेल.",
+    "guestEnded": "गेस्ट वेळ संपली. स्वरम पुन्हा फक्त मालकासाठी काम करेल.",
+    "guestBlocked": "यासाठी मालकाचा आवाज हवा.",
+    "cantHangup": "वेब पेजवरून कॉल कट करता येत नाही. फोनचे लाल बटण दाबा.",
+    "cancelled": "ठीक आहे, रद्द केले.",
+    "batteryLevel": "बॅटरी ",
+    "charging": " टक्के आहे आणि चार्ज होत आहे.",
+    "batteryErr": "या ब्राउझरवर बॅटरी स्थिती उपलब्ध नाही.",
+    "timeIs": "सध्याची वेळ ",
+    "dateIs": "आज ",
+    "remindSet": "ठीक आहे, मी आपल्याला आठवण करून देईन: ",
+    "to": " ",
+    "remindAlert": "आठवण: ",
+    "remindErr": "रिमाइंडर समजले नाही. उदाहरणार्थ: ५ मिनिटांत औषध घ्यायची आठवण करून द्या असे म्हणा.",
+    "noRemind": "आपले कोणतेही सक्रिय रिमाइंडर नाहीत.",
+    "rateChanged": "आवाजाचा वेग बदलला: ",
+    "noPrev": "पुन्हा सांगण्यासाठी कोणतेही मागील उत्तर नाही.",
+    "modeEnded": "मोड समाप्त झाला. मुख्य सहाय्यकावर परतलो.",
+    "chatReady": "व्हॉइस चॅट मोड तयार आहे. काहीही विचारा.",
+    "choosePdf": "कृपया आपल्या अभ्यासाच्या नोट्स पीडीएफ निवडा.",
+    "checkMed": "औषध तपासत आहे. कृपया औषध कॅमेऱ्यासमोर धरा.",
+    "checkCurr": "चलन तपासत आहे. नोट कॅमेऱ्यासमोर धरा.",
+    "checkColor": "रंग आणि प्रकाश तपासत आहे.",
+    "askWhere": "आपल्याला कुठे जायचे आहे?",
+    "navTo": "गुगल मॅप्स नेव्हिगेशन उघडत आहे: "
+  },
+  "bn-IN": {
+    "opening": "খুলছি: ",
+    "tapToOpen": "খুলতে স্ক্রিন স্পর্শ করুন: ",
+    "repeat": "পরিষ্কার শুনতে পাইনি। অনুগ্রহ করে পুরো বাক্যে আবার বলুন।",
+    "enrollStart": "ভয়েস লক সেট করি। আমি চারবার জিজ্ঞাসা করব। প্রতিবার আপনার স্বাভাবিক কণ্ঠে একটি ছোট বাক্য বলুন। এখন শুরু করুন।",
+    "enrollNext": "বেশ। আরেকটি বাক্য বলুন।",
+    "enrollDone": "ভয়েস লক চালু হয়েছে। এখন স্বরম কেবল আপনার কণ্ঠে কাজ করবে।",
+    "mismatch": "এই কণ্ঠ মালিকের নয়। স্বরম অন্যদের জন্য কাজ করে না।",
+    "lockOff": "ভয়েস লক মুছে ফেলা হয়েছে।",
+    "lockHow": "ভয়েস লক চালু আছে। সরাতে নিজের কণ্ঠে ভয়েস লক বন্ধ করো বলুন।",
+    "noMic": "কণ্ঠ শনাক্ত করতে মাইক্রোফোনের অনুমতি প্রয়োজন।",
+    "calling": "কল করছি: ",
+    "callTap": "। ডায়ালার না খুললে স্ক্রিন স্পর্শ করুন।",
+    "noContact": "সেই পরিচিতি পাওয়া যায়নি। পরিচিতি যোগ করো বলে নাম ও নম্বর বলুন।",
+    "saved": "পরিচিতি সেভ হয়েছে: ",
+    "addFail": "অনুগ্রহ করে পরিচিতি যোগ করো, নাম এবং ১০ সংখ্যার ফোন নম্বর বলুন।",
+    "noContacts": "এখনও কোনো পরিচিতি নেই।",
+    "contactsAre": "আপনার পরিচিতিগুলো: ",
+    "guestOn": "অতিথি মোড দশ মিনিটের জন্য চালু হয়েছে।",
+    "guestOff": "অতিথি মোড বন্ধ হয়েছে। স্বরম আবার কেবল মালিকের জন্য কাজ করবে।",
+    "guestEnded": "অতিথি সময় শেষ। স্বরম আবার কেবল মালিকের জন্য কাজ করবে।",
+    "guestBlocked": "এর জন্য মালিকের কণ্ঠ প্রয়োজন।",
+    "cantHangup": "ওয়েব পেজ থেকে ফোন কল কাটা যায় না। ফোনের লাল বোতাম টিপুন।",
+    "cancelled": "ঠিক আছে, বাতিল করা হয়েছে।",
+    "batteryLevel": "ব্যাটারি ",
+    "charging": " শতাংশ আছে এবং চার্জ হচ্ছে।",
+    "batteryErr": "এই ব্রাউজারে ব্যাটারি তথ্য উপলব্ধ নেই।",
+    "timeIs": "বর্তমান সময় ",
+    "dateIs": "আজ ",
+    "remindSet": "ঠিক আছে, আমি আপনাকে মনে করিয়ে দেব: ",
+    "to": " ",
+    "remindAlert": "স্মারক: ",
+    "remindErr": "স্মারক বুঝতে পারিনি। যেমন বলুন: ৫ মিনিটে ওষুধ খাওয়ার কথা মনে করিয়ে দাও।",
+    "noRemind": "আপনার কোনো সক্রিয় স্মারক নেই।",
+    "rateChanged": "কণ্ঠের গতি পরিবর্তিত হয়েছে: ",
+    "noPrev": "পুনরাবৃত্তি করার মতো কোনো পূর্ববর্তী উত্তর নেই।",
+    "modeEnded": "মোড সমাপ্ত হয়েছে। মূল সহকারীতে ফিরে এসেছি।",
+    "chatReady": "ভয়েস চ্যাট প্রস্তুত। যেকোনো কিছু জিজ্ঞাসা করুন।",
+    "choosePdf": "অনুগ্রহ করে আপনার পড়ার নোট পিডিএফ নির্বাচন করুন।",
+    "checkMed": "ওষুধ পরীক্ষা করছি। ওষুধের প্যাকেট ক্যামেরার সামনে ধরুন।",
+    "checkCurr": "টাকা পরীক্ষা করছি। নোটটি ক্যামেরার সামনে ধরুন।",
+    "checkColor": "রং ও আলো পরীক্ষা করছি।",
+    "askWhere": "আপনি কোথায় যেতে চান?",
+    "navTo": "গুগল ম্যাপস নেভিগেশন খুলছি: "
+  },
+  "gu-IN": {
+    "opening": "ખોલી રહ્યો છું: ",
+    "tapToOpen": "ખોલવા માટે સ્ક્રીનને અડો: ",
+    "repeat": "બરાબર સંભળાયું નહીં. કૃપા કરીને સંપૂર્ણ વાક્યમાં ફરીથી બોલો.",
+    "enrollStart": "વૉઇસ લૉક સેટ કરીએ. હું ચાર વખત પૂછીશ. દર વખતે તમારા સામાન્ય અવાજમાં એક નાનું વાક્ય બોલો. હવે શરૂ કરો.",
+    "enrollNext": "સરસ. બીજું વાક્ય બોલો.",
+    "enrollDone": "વૉઇસ લૉક ચાલુ થઈ ગયું. હવે સ્વરમ ફક્ત તમારા અવાજ પર કામ કરશે.",
+    "mismatch": "આ અવાજ માલિકનો નથી. સ્વરમ અન્ય લોકો માટે કામ કરતું નથી.",
+    "lockOff": "વૉઇસ લૉક હટાવી દીધું.",
+    "lockHow": "વૉઇસ લૉક ચાલુ છે. હટાવવા માટે પોતાના અવાજમાં વૉઇસ લૉક હટાવો કહો.",
+    "noMic": "અવાજ ઓળખવા માટે માઇક્રોફોનની પરવાનગી જરૂરી છે.",
+    "calling": "કૉલ કરી રહ્યો છું: ",
+    "callTap": ". ડાયલર ન ખુલે તો સ્ક્રીનને અડો.",
+    "noContact": "તે સંપર્ક મળ્યો નથી. સંપર્ક ઉમેરો કહીને નામ અને નંબર જણાવો.",
+    "saved": "સંપર્ક સાચવ્યો: ",
+    "addFail": "કૃપા કરીને સંપર્ક ઉમેરો, નામ અને ૧૦ અંકનો ફોન નંબર બોલો.",
+    "noContacts": "હજી કોઈ સંપર્કો સાચવેલા નથી.",
+    "contactsAre": "તમારા સંપર્કો: ",
+    "guestOn": "મહેમાન મોડ દસ મિનિટ માટે ચાલુ છે.",
+    "guestOff": "મહેમાન મોડ બંધ થયો. સ્વરમ ફરીથી માત્ર માલિક માટે કામ કરશે.",
+    "guestEnded": "મહેમાન સમય પૂરો થયો. સ્વરમ ફરીથી માત્ર માલિક માટે કામ કરશે.",
+    "guestBlocked": "આ માટે માલિકનો અવાજ જોઈએ.",
+    "cantHangup": "વેબ પેજ પરથી ફોન કૉલ કાપી શકાતો નથી. ફોનનું લાલ બટન દબાવો.",
+    "cancelled": "બરાબર, રદ કર્યું.",
+    "batteryLevel": "બેટરી ",
+    "charging": " ટકા છે અને ચાર્જ થઈ રહી છે.",
+    "batteryErr": "આ બ્રાઉઝર પર બેટરી સ્થિતિ ઉપલબ્ધ નથી.",
+    "timeIs": "અત્યારનો સમય ",
+    "dateIs": "આજે ",
+    "remindSet": "બરાબર, હું તમને યાદ કરાવીશ: ",
+    "to": " ",
+    "remindAlert": "યાદ અપાવો: ",
+    "remindErr": "રિમાઇન્ડર સમજાયું નહીં. ઉદાહરણ તરીકે: ૫ મિનિટમાં દવા લેવાનું યાદ કરાવો એમ કહો.",
+    "noRemind": "તમારું કોઈ સક્રિય રિમાઇન્ડર નથી.",
+    "rateChanged": "અવાજની ગતિ બદલાઈ: ",
+    "noPrev": "ફરીથી બોલવા માટે કોઈ પાછલો જવાબ નથી.",
+    "modeEnded": "મોડ સમાપ્ત થયો. સહાયક પર પાછા આવ્યા.",
+    "chatReady": "વૉઇસ ચેટ મોડ તૈયાર છે. કંઈપણ પૂછો.",
+    "choosePdf": "કૃપા કરીને તમારી અભ્યાસ નોંધો પીડીએફ પસંદ કરો.",
+    "checkMed": "દવા તપાસી રહ્યો છું. દવાને કેમેરા સામે રાખો.",
+    "checkCurr": "રૂપિયા તપાસી રહ્યો છું. નોટને કેમેરા સામે રાખો.",
+    "checkColor": "રંગ અને પ્રકાશ ઓળખી રહ્યો છું.",
+    "askWhere": "તમે ક્યાં જવા માગો છો?",
+    "navTo": "ગૂગલ મેપ્સ નેવિગેશન ખોલી રહ્યો છું: "
+  },
+  "pa-IN": {
+    "opening": "ਖੋਲ੍ਹ ਰਿਹਾ ਹਾਂ: ",
+    "tapToOpen": "ਖੋਲ੍ਹਣ ਲਈ ਸਕ੍ਰੀਨ ਛੂਹੋ: ",
+    "repeat": "ਸਾਫ਼ ਸੁਣਾਈ ਨਹੀਂ ਦਿੱਤਾ। ਕਿਰਪਾ ਕਰਕੇ ਪੂਰੇ ਵਾਕ ਵਿੱਚ ਦੁਬਾਰਾ ਬੋਲੋ।",
+    "enrollStart": "ਆਵਾਜ਼ ਲੌਕ ਸੈੱਟ ਕਰਦੇ ਹਾਂ। ਮੈਂ ਚਾਰ ਵਾਰ ਪੁੱਛਾਂਗਾ। ਹਰ ਵਾਰ ਆਪਣੀ ਆਮ ਆਵਾਜ਼ ਵਿੱਚ ਛੋਟਾ ਵਾਕ ਬੋਲੋ। ਹੁਣ ਸ਼ੁਰੂ ਕਰੋ।",
+    "enrollNext": "ਵਧੀਆ। ਇੱਕ ਹੋਰ ਵਾਕ ਬੋਲੋ।",
+    "enrollDone": "ਆਵਾਜ਼ ਲੌਕ ਚਾਲੂ ਹੋ ਗਿਆ। ਹੁਣ ਸਵਰਮ ਸਿਰਫ਼ ਤੁਹਾਡੀ ਆਵਾਜ਼ ਤੇ ਕੰਮ ਕਰੇਗਾ।",
+    "mismatch": "ਇਹ ਆਵਾਜ਼ ਮਾਲਕ ਦੀ ਨਹੀਂ ਹੈ। ਸਵਰਮ ਦੂਜਿਆਂ ਲਈ ਕੰਮ ਨਹੀਂ ਕਰਦਾ।",
+    "lockOff": "ਆਵਾਜ਼ ਲੌਕ ਹਟਾ ਦਿੱਤਾ ਗਿਆ।",
+    "lockHow": "ਆਵਾਜ਼ ਲੌਕ ਚਾਲੂ ਹੈ। ਹਟਾਉਣ ਲਈ ਆਪਣੀ ਆਵਾਜ਼ ਵਿੱਚ ਆਵਾਜ਼ ਲੌਕ ਹਟਾਓ ਬੋਲੋ।",
+    "noMic": "ਆਵਾਜ਼ ਪਛਾਣਨ ਲਈ ਮਾਈਕ੍ਰੋਫੋਨ ਦੀ ਇਜਾਜ਼ਤ ਚਾਹੀਦੀ ਹੈ।",
+    "calling": "ਕਾਲ ਕਰ ਰਿਹਾ ਹਾਂ: ",
+    "callTap": "। ਜੇ ਡਾਇਲਰ ਨਾ ਖੁੱਲ੍ਹੇ ਤਾਂ ਸਕ੍ਰੀਨ ਛੂਹੋ।",
+    "noContact": "ਉਹ ਸੰਪਰਕ ਨਹੀਂ ਮਿਲਿਆ। ਸੰਪਰਕ ਜੋੜੋ ਕਹਿ ਕੇ ਨਾਮ ਅਤੇ ਨੰਬਰ ਦੱਸੋ।",
+    "saved": "ਸੰਪਰਕ ਸੁਰੱਖਿਅਤ ਹੋ ਗਿਆ: ",
+    "addFail": "ਕਿਰਪਾ ਕਰਕੇ ਸੰਪਰਕ ਜੋੜੋ, ਨਾਮ ਅਤੇ ੧੦ ਅੰਕਾਂ ਦਾ ਫ਼ੋਨ ਨੰਬਰ ਬੋਲੋ।",
+    "noContacts": "ਅਜੇ ਕੋਈ ਸੰਪਰਕ ਸੇਵ ਨਹੀਂ ਹਨ।",
+    "contactsAre": "ਤੁਹਾਡੇ ਸੰਪਰਕ: ",
+    "guestOn": "ਮਹਿਮਾਨ ਮੋਡ ਦਸ ਮਿੰਟਾਂ ਲਈ ਚਾਲੂ ਹੈ।",
+    "guestOff": "ਮਹਿਮਾਨ ਮੋਡ ਬੰਦ ਹੋ ਗਿਆ। ਸਵਰਮ ਦੁਬਾਰਾ ਸਿਰਫ਼ ਮਾਲਕ ਲਈ ਕੰਮ ਕਰੇਗਾ।",
+    "guestEnded": "ਮਹਿਮਾਨ ਸਮਾਂ ਸਮਾਪਤ ਹੋ ਗਿਆ। ਸਵਰਮ ਦੁਬਾਰਾ ਸਿਰਫ਼ ਮਾਲਕ ਲਈ ਕੰਮ ਕਰੇਗਾ।",
+    "guestBlocked": "ਇਸ ਲਈ ਮਾਲਕ ਦੀ ਆਵਾਜ਼ ਚਾਹੀਦੀ ਹੈ।",
+    "cantHangup": "ਵੈੱਬ ਪੇਜ ਤੋਂ ਕਾਲ ਖਤਮ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਫ਼ੋਨ ਦਾ ਲਾਲ ਬਟਨ ਦਬਾਓ।",
+    "cancelled": "ਠੀਕ ਹੈ, ਰੱਦ ਕਰ ਦਿੱਤਾ।",
+    "batteryLevel": "ਬੈਟਰੀ ",
+    "charging": " ਪ੍ਰਤੀਸ਼ਤ ਹੈ ਅਤੇ ਚਾਰਜ ਹੋ ਰਹੀ ਹੈ।",
+    "batteryErr": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਤੇ ਬੈਟਰੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+    "timeIs": "ਮੌਜੂਦਾ ਸਮਾਂ ",
+    "dateIs": "ਅੱਜ ",
+    "remindSet": "ਠੀਕ ਹੈ, ਮੈਂ ਤੁਹਾਨੂੰ ਯਾਦ ਕਰਵਾਵਾਂਗਾ: ",
+    "to": " ",
+    "remindAlert": "ਯਾਦ-ਪੱਤਰ: ",
+    "remindErr": "ਰਿਮਾਈਂਡਰ ਸਮਝ ਨਹੀਂ ਆਇਆ। ਉਦਾਹਰਣ ਵਜੋਂ: ੫ ਮਿੰਟ ਵਿੱਚ ਦਵਾਈ ਲੈਣ ਦੀ ਯਾਦ ਦਿਵਾਓ ਬੋਲੋ।",
+    "noRemind": "ਤੁਹਾਡਾ ਕੋਈ ਸਰਗਰਮ ਰਿਮਾਈਂਡਰ ਨਹੀਂ ਹੈ।",
+    "rateChanged": "ਬੋਲਣ ਦੀ ਗਤੀ ਬਦਲ ਦਿੱਤੀ ਗਈ: ",
+    "noPrev": "ਦੁਹਰਾਉਣ ਲਈ ਕੋਈ ਪਿਛਲਾ ਜਵਾਬ ਨਹੀਂ ਹੈ।",
+    "modeEnded": "ਮੋਡ ਸਮਾਪਤ ਹੋਇਆ। ਸਹਾਇਕ ਤੇ ਵਾਪਸ ਆ ਗਏ।",
+    "chatReady": "ਵੌਇਸ ਚੈਟ ਮੋਡ ਤਿਆਰ ਹੈ। ਕੁਝ ਵੀ ਪੁੱਛੋ।",
+    "choosePdf": "ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੇ ਅਧਿਐਨ ਨੋਟਸ ਪੀਡੀਐਫ ਚੁਣੋ।",
+    "checkMed": "ਦਵਾਈ ਦੀ ਜਾਂਚ ਕਰ ਰਿਹਾ ਹਾਂ। ਦਵਾਈ ਕੈਮਰੇ ਦੇ ਸਾਹਮਣੇ ਰੱਖੋ।",
+    "checkCurr": "ਰੁਪਏ ਦੀ ਜਾਂਚ ਕਰ ਰਿਹਾ ਹਾਂ। ਨੋਟ ਕੈਮਰੇ ਦੇ ਸਾਹਮਣੇ ਰੱਖੋ।",
+    "checkColor": "ਰੰਗ ਅਤੇ ਰੌਸ਼ਨੀ ਦੀ ਜਾਂਚ ਕਰ ਰਿਹਾ ਹਾਂ।",
+    "askWhere": "ਤੁਸੀਂ ਕਿੱਥੇ ਜਾਣਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    "navTo": "ਗੂਗਲ ਮੈਪਸ ਨੇਵੀਗੇਸ਼ਨ ਖੋਲ੍ਹ ਰਿਹਾ ਹਾਂ: "
+  },
+  "ur-IN": {
+    "opening": "کھول رہا ہوں: ",
+    "tapToOpen": "کھولنے کے لیے اسکرین کو چھوئیں: ",
+    "repeat": "صاف سنائی نہیں دیا۔ براہ کرم پورے جملے میں دوبارہ کہیے۔",
+    "enrollStart": "آواز کا لاک سیٹ کرتے ہیں۔ میں چار بار پوچھوں گا۔ ہر بار اپنی عام آواز میں ایک چھوٹا جملہ بولیے۔ اب شروع کیجیے۔",
+    "enrollNext": "بہتر۔ ایک اور جملہ بولیے۔",
+    "enrollDone": "وائس لاک آن ہو گیا۔ اب سورم صرف آپ کی آواز پر کام کرے گا۔",
+    "mismatch": "یہ آواز مالک کی نہیں ہے۔ سورم دوسروں کے لیے کام نہیں کرتا۔",
+    "lockOff": "وائس لاک ہٹا دیا گیا۔",
+    "lockHow": "وائس لاک آن ہے۔ ہٹانے کے لیے اپنی آواز میں وائس لاک ہٹاؤ بولیے۔",
+    "noMic": "آواز پہچاننے کے لیے مائیکروفون کی اجازت درکار ہے۔",
+    "calling": "کال کر رہا ہوں: ",
+    "callTap": "۔ اگر ڈائلر نہ کھلے تو اسکرین کو چھوئیں.",
+    "noContact": "وہ رابطہ نہیں ملا۔ رابطہ جوڑیں کہہ کر نام اور فون نمبر بتائیے۔",
+    "saved": "رابطہ محفوظ ہو گیا: ",
+    "addFail": "براہ کرم رابطہ جوڑیں، نام اور ۱۰ ہندسوں کا فون نمبر بتائیے۔",
+    "noContacts": "ابھی کوئی رابطہ محفوظ نہیں ہے۔",
+    "contactsAre": "آپ کے رابطے: ",
+    "guestOn": "مہمان موڈ دس منٹ کے لیے آن ہے۔",
+    "guestOff": "مہمان موڈ بند ہو گیا۔ سورم دوبارہ صرف مالک کے لیے کام کرے گا۔",
+    "guestEnded": "مہمان کا وقت ختم ہو گیا۔ سورم دوبارہ صرف مالک کے لیے کام کرے گا۔",
+    "guestBlocked": "اس کے لیے مالک کی آواز چاہیے۔",
+    "cantHangup": "ویب پیج سے کال ختم نہیں کی جا سکتی۔ فون کا سرخ بٹن دبائیں۔",
+    "cancelled": "ٹھیک ہے، منسوخ کر دیا گیا۔",
+    "batteryLevel": "بیٹری ",
+    "charging": " فیصد ہے اور چارج ہو رہی ہے۔",
+    "batteryErr": "اس براؤزر پر بیٹری کی معلومات دستیاب نہیں ہیں۔",
+    "timeIs": "ابھی کا وقت ہے ",
+    "dateIs": "آج ",
+    "remindSet": "ٹھیک ہے، میں آپ کو یاد دلاؤں گا: ",
+    "to": " ",
+    "remindAlert": "یاد دہانی: ",
+    "remindErr": "یاد دہانی سمجھ نہیں آئی۔ مثال کے طور پر: ۵ منٹ میں دوا لینا یاد دلانا کہیے۔",
+    "noRemind": "آپ کی کوئی فعال یاد دہانی نہیں ہے۔",
+    "rateChanged": "بولنے کی رفتار تبدیل کر دی گئی: ",
+    "noPrev": "دہرانے کے لیے کوئی پچھلا جواب نہیں ہے۔",
+    "modeEnded": "موڈ ختم ہوا۔ معاون پر واپس آ گئے۔",
+    "chatReady": "وائس چیٹ موڈ تیار ہے۔ کچھ بھی پوچھیے۔",
+    "choosePdf": "براہ کرم اپنے اسٹڈی نوٹس پی ڈی ایف منتخب کریں۔",
+    "checkMed": "دوا چیک کر رہا ہوں۔ دوا کیمرے کے سامنے رکھیں۔",
+    "checkCurr": "کرنسی چیک کر رہا ہوں۔ نوٹ کیمرے کے سامنے رکھیں۔",
+    "checkColor": "رنگ اور روشنی کی جانچ کر رہا ہوں۔",
+    "askWhere": "آپ کہاں جانا چاہتے ہیں؟",
+    "navTo": "گوگل میپس نیویگیشن کھول رہا ہوں: "
   }
 };
 
-// ================= more languages (menu text is translated by Gemini the first time) =================
+// Fast proxy fallbacks
 const T = new Proxy(T_RAW, { get: (o, k) => o[k] || o['en-IN'] });
 const V = new Proxy(V_RAW, { get: (o, k) => o[k] || o['en-IN'] });
 const BASE_LANGS = ['te-IN', 'hi-IN', 'en-IN'];
-const EXTRA_LANGS = [['ta-IN', 'தமிழ்'], ['kn-IN', 'ಕನ್ನಡ'], ['ml-IN', 'മലയാളം'], ['mr-IN', 'मराठी'],
-  ['bn-IN', 'বাংলা'], ['gu-IN', 'ગુજરાતી'], ['pa-IN', 'ਪੰਜਾਬੀ'], ['ur-IN', 'اردو']];
-const SR_LANG = { 'pa-IN': 'pa-guru-IN' };       // Chrome's code for Punjabi (Gurmukhi) speech recognition
-// Extra languages are now neatly unified inside #langSelect
+const EXTRA_LANGS = [
+  ['ta-IN', 'தமிழ்'], ['kn-IN', 'ಕನ್ನಡ'], ['ml-IN', 'മലയാളം'], ['mr-IN', 'मराठी'],
+  ['bn-IN', 'বাংলা'], ['gu-IN', 'ગુજરાતી'], ['pa-IN', 'ਪੰਜਾਬੀ'], ['ur-IN', 'اردو']
+];
+const SR_LANG = {
+  'pa-IN': 'pa-guru-IN',
+  'ur-IN': 'ur-IN'
+};
+
+// Optional dynamic fetcher if extra strings are ever requested
 async function ensureStrings(code) {
   if (T_RAW[code] && V_RAW[code]) return;
   try {
@@ -401,8 +914,8 @@ async function ensureStrings(code) {
   } catch (e) { console.error(e); }                // stay on English menu text
 }
 
-// ================= open apps / websites by voice =================
-// BEGIN-OPEN
+// quick web shortcuts
+
 const SITES = [
   [/you\s*tube|యూట్యూబ్|यूट्यूब|यूट्युब/i, 'YouTube', 'https://www.youtube.com'],
   [/google\s*maps|\bmaps?\b|మ్యాప్స్|मैप्स|मैप/i, 'Maps', 'https://maps.google.com'],
@@ -451,10 +964,10 @@ function parseOpen(text) {
 const LOCKW = /voice\s*lock|lock\s*(my\s*)?voice|(register|set\s*up|set)\s*(my\s*)?voice|वॉ[इय]स\s*लॉक|आवा\S{0,3}\s*लॉक|వాయిస్\s*లాక్|గొంతు\s*లాక్/i;
 const OFFW = /turn\s*off|remove|disable|unlock|\boff\b|stop|हटा|बंद|ऑफ|తీసే|తీయ|ఆఫ్|తొలగ/i;
 function parseLockCmd(t) { if (!LOCKW.test(t)) return null; return OFFW.test(t) ? 'off' : 'on'; }
-// END-OPEN
 
-// ================= call contacts by voice =================
-// BEGIN-CALL
+
+// phone dialing and contacts
+
 const CALLV = /\b(call|dial|phone|ring|make a call|place a call)\b|కాల్\s*(చేయి|చెయ్|చెయ్యి)?|ఫోన్\s*(చేయి|చెయ్|చెయ్యి)?|డయల్\s*(చేయి|చెయ్)?|कॉल\s*(करो|कीजिए|लगाओ|लगाएं)?|फ़ोन\s*(करो|कीजिए|लगाओ|लगाएं)?|फोन\s*(करो|कीजिए|लगाओ|लगाएं)?|डायल\s*(करो|कीजिए)?/i;
 const ADDV = /\b(save|add|set|update)\b.*\b(contact|number|phone)\b|\b(save|add|set|update)\s+([a-zA-Z\u0C00-\u0C7F\u0900-\u097F]+)\s+(\+?\d[\d\s\-]{6,15})|\b([a-zA-Z\u0C00-\u0C7F\u0900-\u097F]+)\s*(?:'s)?\s*(?:number|phone|mobile|నంబర్|నంబరు|నెంబర్|नंबर)\s*(?:is|=|:)?\s*(\+?\d[\d\s\-]{6,15})|కాంటాక్ట్\s*(యాడ్|సేవ్)|నంబర్\s*(సేవ్|మార్చు|పెట్టు)|(సేవ్|యాడ్)\s*చేయి|कॉन्टैक्ट\s*(जोड़|जोड|सेव|add)|नंबर\s*(सेव|डालो|बदलो)/i;
 const LISTV = /\b(list|read|tell|view|show|see)\b.*\bcontacts?\b|\bmy contacts\b|కాంటాక్ట్స్|కాంటాక్ట్‌లు|కాంటాక్ట్ లిస్ట్|कॉन्टैक्ट्स|मेरे संपर्क|संपर्क सूची/i;
@@ -971,10 +1484,10 @@ function doContact(cc) {
   if (lang.startsWith('hi')) callingMsg = `${cc.name} को कॉल कर रहे हैं। डायलर खोलने के लिए कहीं भी टच करें।`;
   speak(callingMsg);
 }
-// END-CALL
 
-// ================= guest mode, ending calls, cancel, AI commands for any language =================
-// BEGIN-CMD
+
+// command router and guest mode
+
 const GUEST_WORD = /guest|అతిథి|గెస్ట్|मेहमान|गेस्ट/i;
 const GUEST_OFF = /\b(stop|end|off|disable|finish|cancel)\b|ఆపు|ముగించు|ఆఫ్|తీసేయ|बंद|खत्म|हटा|ऑफ|समाप्त/i;
 const GUEST_ON = /\b(allow|let|permit|permission)\b.*\b(guest|friend|someone|person|people|others?)\b|\bguest\s*mode\b|\bguest\b.*\b(talk|speak|use)\b|(అతిథి|గెస్ట్).*(అనుమతి|ఆన్|మోడ్)|స్నేహితుడు.*(అనుమతి|మాట్లాడ)|మరొకరిని.*(అనుమతి|మాట్లాడ)|(मेहमान|गेस्ट).*(इजाज़त|इजाजत|अनुमति|चालू|मोड)|दोस्त.*(इजाज़त|इजाजत|अनुमति|बात)|दूसरे.*(इजाज़त|इजाजत|अनुमति|बात)/i;
@@ -1041,7 +1554,6 @@ function runIntent(it) {            // it = JSON from /api/intent; returns true 
   }
   return false;
 }
-// END-CMD
 
 async function aiIntent(text) {
   try {
@@ -1053,7 +1565,7 @@ async function aiIntent(text) {
   } catch (e) { return null; }
 }
 
-// (Duplicate contact functions removed; authoritative implementations defined above)
+// unified contact actions
 const contactBtnEl = document.getElementById('btnAddContact') || document.getElementById('contactBtn');
 if (contactBtnEl) {
   contactBtnEl.addEventListener('click', (e) => {
@@ -1122,9 +1634,9 @@ function doOpen(op) {
   else { pendingUrl = op.url; speak(V[lang].tapToOpen + op.name); }
 }
 
-// ================= voice lock (demo-grade speaker check) =================
+// voice authentication helper
 // Compares the average "sound shape" (MFCC-style features) of the speaker with the owner's saved profile.
-// It is a hackathon demo, NOT bank-grade security. Tune with ?min=2.0&k=2.2 in the URL.
+// Client-side speaker check. Can calibrate sensitivity with ?min=2.0&k=2.2
 const VP = { KEY: 'swaramVoice', K: 2.2, MIN: 2.0, MINRANGE: 8, MINFRAMES: 12, N_ENROLL: 4, DEBUG: true };
 {
   const q = new URLSearchParams(location.search);
@@ -1134,7 +1646,6 @@ const VP = { KEY: 'swaramVoice', K: 2.2, MIN: 2.0, MINRANGE: 8, MINFRAMES: 12, N
 }
 const NMEL = 24, NCEP = 12;
 
-// BEGIN-PROFILE
 function rmsDist(a, b) { let s = 0; for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; s += d * d; } return Math.sqrt(s / a.length); }
 function makeProfile(vecs) {
   const n = vecs.length;
@@ -1143,7 +1654,6 @@ function makeProfile(vecs) {
   return { mu, spread };
 }
 function limitOf(p) { return Math.max(p.spread * VP.K, VP.MIN); }
-// END-PROFILE
 
 const dbg = document.getElementById('dbg');
 const lockBtn = document.getElementById('btnVoiceLock') || document.getElementById('lockBtn');
@@ -1577,7 +2087,7 @@ if (readScreenBtn) {
 }
 
 
-// ================= AUDIO CUES (EARCONS) & SPEECH SPEED =================
+// audio cues and speed controls
 let speechRate = parseFloat(localStorage.getItem('swaramSpeechRate') || '1.0');
 let lastSpokenText = '';
 
@@ -1742,7 +2252,7 @@ document.addEventListener('touchend', (e) => {
   lastTapTime = now;
 }, { passive: false });
 
-// ================= CAMERA-TO-VOICE & EMERGENCY SOS =================
+// camera scanner and emergency alert
 let isCameraCapturing = false;
 
 async function describeCamera(mode = 'general') {
@@ -1858,19 +2368,15 @@ async function describeCamera(mode = 'general') {
   }
 }
 
-// ================= HANDS-FREE DEVICE STATUS (BATTERY, TIME, DATE) =================
+// device status helpers
 async function speakBatteryStatus() {
+  const v = V[lang] || V['en-IN'];
   if (typeof navigator.getBattery === 'function') {
     try {
       const b = await navigator.getBattery();
       const pct = Math.round(b.level * 100);
       const charging = b.charging;
-      let msg = `Battery is at ${pct} percent${charging ? ' and currently charging' : ''}.`;
-      if (lang.startsWith('te')) {
-        msg = `బ్యాటరీ ${pct} శాతం ఉంది${charging ? ' మరియు ఛార్జ్ అవుతోంది' : ''}.`;
-      } else if (lang.startsWith('hi')) {
-        msg = `बैटरी ${pct} प्रतिशत है${charging ? ' और चार्ज हो रही है' : ''}।`;
-      }
+      let msg = `${v.batteryLevel || 'Battery is at '}${pct}${charging ? (v.charging || ' percent and charging.') : ' percent.'}`;
       textEl.textContent = '🔋 ' + msg;
       speak(msg);
       return;
@@ -1878,9 +2384,7 @@ async function speakBatteryStatus() {
       console.warn('Battery API error:', e);
     }
   }
-  let fallback = 'Battery status is not supported on this browser.';
-  if (lang.startsWith('te')) fallback = 'ఈ బ్రౌజర్‌లో బ్యాటరీ స్థితి అందుబాటులో లేదు.';
-  if (lang.startsWith('hi')) fallback = 'इस ब्राउज़र पर बैटरी स्थिति उपलब्ध नहीं है।';
+  const fallback = v.batteryErr || 'Battery status is not supported on this browser.';
   textEl.textContent = '🔋 ' + fallback;
   speak(fallback);
 }
@@ -1888,9 +2392,9 @@ async function speakBatteryStatus() {
 function speakTimeStatus() {
   const now = new Date();
   const timeStr = now.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit', hour12: true });
-  let msg = `The time is ${timeStr}.`;
-  if (lang.startsWith('te')) msg = `ప్రస్తుత సమయం ${timeStr}.`;
-  if (lang.startsWith('hi')) msg = `अभी का समय ${timeStr} है।`;
+  const v = V[lang] || V['en-IN'];
+  const prefix = v.timeIs || 'The time is ';
+  const msg = `${prefix}${timeStr}.`;
   textEl.textContent = '🕒 ' + msg;
   speak(msg);
 }
@@ -1898,14 +2402,14 @@ function speakTimeStatus() {
 function speakDateStatus() {
   const now = new Date();
   const dateStr = now.toLocaleDateString(lang, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  let msg = `Today is ${dateStr}.`;
-  if (lang.startsWith('te')) msg = `ఈ రోజు ${dateStr}.`;
-  if (lang.startsWith('hi')) msg = `आज ${dateStr} है।`;
+  const v = V[lang] || V['en-IN'];
+  const prefix = v.dateIs || 'Today is ';
+  const msg = `${prefix}${dateStr}.`;
   textEl.textContent = '📅 ' + msg;
   speak(msg);
 }
 
-// ================= SPOKEN VOICE REMINDERS SUBSYSTEM =================
+// voice reminders scheduler
 const REMINDERS_KEY = 'swaramReminders';
 const REMINDV = /\b(remind\s*me(\s*to)?|set\s*(a\s*)?reminder(\s*to|\s*for)?|set\s*(a\s*)?timer(\s*to|\s*for)?|alert\s*me(\s*to)?)\b|గుర్తు\s*చేయి|జ్ఞాపకం\s*చేయి|యాది\s*చేయి|याद\s*(दिलाओ|दिलाना|रखना)|रिमाइंडर\s*(लगाओ|सेट)/i;
 let activeReminders = [];
@@ -2003,9 +2507,8 @@ function fireReminder(rem) {
   playReminderChime();
   haptic([120, 80, 120, 80, 250]);
 
-  let alertMsg = `Reminder: ${rem.task}!`;
-  if (lang.startsWith('te')) alertMsg = `రిమైండర్: ${rem.task}!`;
-  if (lang.startsWith('hi')) alertMsg = `रिमाइंडर: ${rem.task}!`;
+  const v = V[lang] || V['en-IN'];
+  let alertMsg = `${v.remindAlert || 'Reminder: '}${rem.task}!`;
 
   textEl.textContent = '⏰ ' + alertMsg;
   speak(alertMsg);
@@ -2290,7 +2793,7 @@ function triggerEmergencySos() {
   }
 }
 
-// ================= VOCO & INTERACTIVE LEARNING MODES =================
+// interactive study modes
 let activeMode = null; // null | 'quiz' | 'story' | 'form'
 let currentStoryTopic = 'a short inspiring moral story';
 let currentCourse = 'dsa';
@@ -2751,6 +3254,11 @@ function playNextSentence() {
 
   const engine = (typeof ttsEngine !== 'undefined' && ttsEngine) ? ttsEngine : (localStorage.getItem('swaramTtsEngine') || 'instant');
   if (engine === 'instant' || !navigator.onLine) {
+    const v = pickVoice(lang);
+    if (!v && navigator.onLine) {
+      playTtsAudio(sentence, myId, onFinished);
+      return;
+    }
     fallbackBrowserSpeak(sentence, myId, onFinished);
     return;
   }
@@ -2847,17 +3355,70 @@ function speak(text) {
   }
 }
 
+function playTtsAudio(text, myId, done) {
+  try {
+    const audioUrl = `/api/tts?lang=${encodeURIComponent(lang)}&engine=fast&text=${encodeURIComponent(text)}`;
+    const audio = new Audio(audioUrl);
+    audio.playbackRate = speechRate;
+    currentAudio = audio;
+    
+    audio.onplay = () => { if (myId === speakId) setState('speaking'); };
+    audio.onended = () => {
+      currentAudio = null;
+      done();
+    };
+    audio.onerror = () => {
+      currentAudio = null;
+      // Ultimate browser utterance attempt
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang;
+        u.onend = done;
+        u.onerror = done;
+        speechSynthesis.speak(u);
+      } catch(e) { done(); }
+    };
+
+    const p = audio.play();
+    if (p !== undefined) {
+      p.catch(() => {
+        currentAudio = null;
+        try {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = lang;
+          u.onend = done;
+          u.onerror = done;
+          speechSynthesis.speak(u);
+        } catch(e) { done(); }
+      });
+    }
+  } catch (e) {
+    done();
+  }
+}
+
 function fallbackBrowserSpeak(text, myId, done) {
+  const v = pickVoice(lang);
+  // If no native voice pack is installed in this browser for this Indian language, use online TTS
+  if (!v && navigator.onLine) {
+    playTtsAudio(text, myId, done);
+    return;
+  }
   try { window.speechSynthesis.cancel(); } catch(e) {}
   try { window.speechSynthesis.resume(); } catch(e) {}
   const u = new SpeechSynthesisUtterance(text);
   u.lang = lang;
-  const v = pickVoice(lang);
   if (v) u.voice = v;
   u.rate = speechRate;
   u.onstart = () => { if (myId === speakId) setState('speaking'); };
   u.onend = done;
-  u.onerror = done;
+  u.onerror = () => {
+    if (navigator.onLine) {
+      playTtsAudio(text, myId, done);
+    } else {
+      done();
+    }
+  };
   
   const estDuration = Math.max(2500, (text.split(' ').length / 2) * 1000 + 2000);
   setTimeout(() => {
@@ -3201,7 +3762,7 @@ async function handle(text, vec) {
     return;
   }
 
-  // 5. Who built you / Team & Creator identity (Human verification for judges)
+  // team info and credits
   if (/\b(who (made|built|created|developed)|tell me about (the|your) team|creator|developer|about you|about project|who is pavan)\b|ఎవరు\s*(చేశారు|తయారు\s*చేశారు)|పవన్\s*ఎవరు|టీమ్\s*ఎవరు|किसने\s*(बनाया|डेवलप\s*किया)|टीम\s*के\s*बारे|पवन\s*कौन/i.test(norm)) {
     showTeamModal();
     let msg = "Swaram was designed and built by Durga Pavan Teja and team as an accessibility-first voice tutor for visually impaired learners in India.";
@@ -3211,7 +3772,7 @@ async function handle(text, vec) {
     return;
   }
 
-  // 6. Architecture Breakdown / How much AI is used / Human vs AI Ratio (Hackathon Judge Verification)
+  // system architecture details
   if (/\b(how much ai|percentage of ai|ratio of ai|is this (all|100%|only|just) ai|are you (an )?ai wrapper|how (was|is) this built|architecture|engineering|tech stack|hackathon|how much percentage|20 percent|80 percent)\b|ఎంత\s*శాతం\s*ఏఐ|ఎలా\s*నిర్మించారు|ఇంజనీరింగ్|ఆర్కిటెక్చర్|कितना\s*प्रतिशत\s*एआई|कैसे\s*बनाया|आर्किटेक्चर/i.test(norm)) {
     showTeamModal();
     let msg = "We built Swaram using Python Flask, SQLite, and Web Audio APIs. The core system handles audio processing, local SQLite storage, phone contacts, and navigation math on our own server and browser, using Gemini strictly for conversational questions.";
@@ -3674,7 +4235,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 
-// ================= TOP BAR & DRAWER WIRING =================
+// top bar and drawer navigation
 
 const btnTtsEngine = $('btnTtsEngine');
 
