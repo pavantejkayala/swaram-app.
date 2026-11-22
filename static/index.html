@@ -1326,8 +1326,11 @@ let audioCtx;
 function beep(freq, ms) {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.frequency.value = freq; g.gain.value = 0.15;
+    o.frequency.value = freq; g.gain.value = 0.2;
     o.connect(g); g.connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime + ms / 1000);
   } catch (e) {}
@@ -1381,7 +1384,7 @@ function setLang(code) {
 }
 
 // ---------- wake word & human speech synthesis ----------
-const WAKE_WORD_RE = /\b(hey|hi|hello|ok|okay|suno|सुनो|హే|ఓయ్|నమస్తే)?\s*(swaram|shwaram|swaramu|swaramm|స్వరం|स्वरम)\b/i;
+const WAKE_WORD_RE = /(?:(?:\b|^)(hey|hay|he|hi|hello|ok|okay|aye|suno|सुनो|हे|హే|ఓయ్|నమస్తే)\s+)?(swaram|swara|shwaram|shwara|svaram|svara|swaramu|swaramm|swarna|swar|స్వరము|స్వరం|స్వర|स्वरम|स्वर)(?:[,\s.!?]|$|\b)/i;
 
 const WAKE_ACKS = {
   'te-IN': 'చెప్పండి, నేను వింటున్నాను!',
@@ -2891,7 +2894,7 @@ function listen(wakeWait = false) {
   
   rec.onstart = () => { 
     if (isWakeWaiting) {
-      document.body.dataset.state = 'idle';
+      setState('idle');
       stateEl.textContent = 'Say "Hey Swaram" or tap anywhere';
     } else {
       setState('listening'); 
@@ -2912,30 +2915,39 @@ function listen(wakeWait = false) {
     }
     const current = (finalHeard || interim).trim();
 
-    // Check for Wake Word "Hey Swaram" in background or idle state
-    if (isWakeWaiting || (state === 'idle' && current)) {
-      if (WAKE_WORD_RE.test(current)) {
+    // 1. Instant Wake Word Detection ("Hey Swaram")
+    if (WAKE_WORD_RE.test(current)) {
+      const command = current.replace(WAKE_WORD_RE, '').replace(/^[\s,\.!?]+|[\s,\.!?]+$/g, '').trim();
+      if (!command || command.length < 2) {
+        // User said ONLY "Hey Swaram" -> Immediate chime, haptic & warm spoken response
         if (silenceTimer) clearTimeout(silenceTimer);
         got = true;
         isWakeWaiting = false;
         chime();
+        haptic(50);
         try { rec.abort(); } catch(err) {}
-        
-        // Extract command if spoken in same sentence (e.g. "Hey Swaram what is today's date")
-        const command = current.replace(WAKE_WORD_RE, '').trim();
         session = true;
-        
-        if (command.length > 2) {
-          textEl.textContent = '“' + command + '”';
-          handle(command, null);
-        } else {
-          const ack = WAKE_ACKS[lang] || WAKE_ACKS['en-IN'];
-          speak(ack);
-        }
+        const ack = WAKE_ACKS[lang] || WAKE_ACKS['en-IN'];
+        textEl.textContent = '🎙️ ' + ack;
+        speak(ack);
         return;
       }
-      return; // Still waiting for wake word
+      // If user said "Hey Swaram [command]" while waiting for wake word, process command immediately
+      if (isWakeWaiting || state === 'idle') {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        got = true;
+        isWakeWaiting = false;
+        chime();
+        haptic(50);
+        try { rec.abort(); } catch(err) {}
+        session = true;
+        textEl.textContent = '“' + command + '”';
+        handle(command, null);
+        return;
+      }
     }
+
+    if (isWakeWaiting) return; // Still waiting for wake word in background mode
 
     // Active conversation listening
     if (current) {
@@ -3083,10 +3095,27 @@ function handleOffline(text) {
 
 async function handle(text, vec) {
   if (gateCheck(text, vec)) return;
-  textEl.textContent = '“' + text + '”';
+
+  // Instant Wake-Word Handling: "Hey Swaram" or "Hey Swaram, [command]"
+  let cleanText = (text || '').trim();
+  if (WAKE_WORD_RE.test(cleanText)) {
+    const afterWake = cleanText.replace(WAKE_WORD_RE, '').replace(/^[\s,\.!?]+|[\s,\.!?]+$/g, '').trim();
+    if (!afterWake || afterWake.length < 2) {
+      session = true;
+      chime();
+      haptic(50);
+      const ack = WAKE_ACKS[lang] || WAKE_ACKS['en-IN'];
+      textEl.textContent = '🎙️ ' + ack;
+      speak(ack);
+      return;
+    }
+    cleanText = afterWake;
+  }
+
+  textEl.textContent = '“' + cleanText + '”';
 
   if (!navigator.onLine) {
-    handleOffline(text);
+    handleOffline(cleanText);
     return;
   }
 
