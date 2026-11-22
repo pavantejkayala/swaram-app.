@@ -3129,7 +3129,6 @@ async function handle(text, vec) {
   if (cc) { if (isGuest) guestBlock(); else doContact(cc); return; }
 
   // Clean search prefixes so Swaram directly answers search queries
-  let cleanText = text.trim();
   if (SEARCHV.test(cleanText)) {
     const stripped = cleanText.replace(new RegExp(SEARCHV.source, 'gi'), ' ').replace(FILLER, ' ').replace(/\s+/g, ' ').trim();
     if (stripped.length >= 2) cleanText = stripped;
